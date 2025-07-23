@@ -222,6 +222,16 @@ class PlanningPokerFirebaseApp {
             await this.firebaseMessaging.disconnect();
             this.firebaseMessaging = null;
         }
+        this.currentUser = null;
+        this.currentSession = null;
+        this.isHost = false;
+        this.participants = new Map();
+        this.votes = new Map();
+        this.votingEnabled = false;
+        this.votesRevealed = false;
+        this.updateConnectionStatus('disconnected');
+        this.showSessionPanel();
+        this.updateUI();
     }
 
     // Handle state changes from Firebase
@@ -340,92 +350,26 @@ class PlanningPokerFirebaseApp {
 
     updateUI() {
         this.updateParticipantsTable();
-        this.updateTaskList();
         this.updateVotingInterface();
     }
 
     updateParticipantsTable() {
-        const tbody = document.getElementById('participantsBody');
-        const count = document.getElementById('participantCount');
-        
-        tbody.innerHTML = '';
-        count.textContent = `${this.participants.size} participant${this.participants.size !== 1 ? 's' : ''}`;
-        
-        for (let [id, participant] of this.participants) {
-            const row = document.createElement('div');
-            row.className = 'table-row';
-            
-            const hasVoted = this.votes.has(id);
-            const voteValue = this.votesRevealed ? (this.votes.get(id) || '-') : (hasVoted ? '✓' : '-');
-            const connectionStatus = participant.connected ? 'Connected' : 'Disconnected';
-            
-            row.innerHTML = `
-                <div class="col">
-                    <div class="participant-info">
-                        <div class="participant-avatar">${participant.name.charAt(0).toUpperCase()}</div>
-                        <span class="participant-name">${participant.name}</span>
-                    </div>
-                </div>
-                <div class="col">
-                    <span class="badge ${participant.isHost ? 'badge-primary' : 'badge-secondary'}">
-                        ${participant.isHost ? 'Host' : 'Participant'}
-                    </span>
-                </div>
-                <div class="col">
-                    <span class="badge ${participant.connected ? 'badge-success' : 'badge-warning'}">
-                        ${connectionStatus}
-                    </span>
-                </div>
-                <div class="col">
-                    <span class="text-center">${voteValue}</span>
-                </div>
-            `;
-            
-            tbody.appendChild(row);
+        const table = document.querySelector('.participants-table');
+        if (!table) return;
+        table.innerHTML = '';
+        if (!this.participants || this.participants.size === 0) {
+            table.innerHTML = '<p>No participants yet.</p>';
+            return;
         }
+        const html = Array.from(this.participants.values()).map(p => {
+            const status = p.connected ? '🟢 Connected' : '🔴 Disconnected';
+            return `<div class="participant-row"><span>${p.name}</span> <span>${status}</span></div>`;
+        }).join('');
+        table.innerHTML = html;
     }
 
     updateTaskList() {
-        const taskList = document.getElementById('taskList');
-        const currentTaskDisplay = document.getElementById('currentTaskDisplay');
-        const currentTaskSection = document.getElementById('currentTask');
-        
-        if (this.tasks.length === 0) {
-            taskList.innerHTML = '<div class="empty-state">No tasks yet. Add one to get started!</div>';
-        } else {
-            taskList.innerHTML = '';
-            this.tasks.forEach((task) => {
-                const taskItem = document.createElement('div');
-                taskItem.className = `task-item ${task.id === this.currentTaskId ? 'selected' : ''}`;
-                taskItem.innerHTML = `
-                    <div class="task-title">${task.title}</div>
-                    ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
-                `;
-                
-                if (this.isHost) {
-                    taskItem.addEventListener('click', () => this.selectTask(task.id));
-                }
-                
-                taskList.appendChild(taskItem);
-            });
-        }
-        
-        // Update current task display  
-        if (this.currentTaskId) {
-            const currentTask = this.tasks.find(t => t.id === this.currentTaskId);
-            if (currentTask) {
-                currentTaskDisplay.innerHTML = `
-                    <div class="task-title">${currentTask.title}</div>
-                    ${currentTask.description ? `<div class="task-description">${currentTask.description}</div>` : ''}
-                `;
-                currentTaskSection.style.display = 'block';
-            }
-        } else {
-            currentTaskSection.style.display = 'none';
-        }
-        
-        // Show/hide add task button based on host status
-        document.getElementById('addTaskBtn').style.display = this.isHost ? 'block' : 'none';
+        // Task management removed. No task list or add task button.
     }
 
     updateVotingInterface() {
