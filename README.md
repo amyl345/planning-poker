@@ -1,37 +1,43 @@
-# Planning Poker Tool - P2P Edition
 
-A real-time planning poker application for agile teams to estimate story points collaboratively. Built with pure HTML, CSS, and JavaScript using P2P WebRTC technology - no external frameworks or backend servers required.
+# Planning Poker Tool - P2P & Firebase Edition
+
+A real-time planning poker application for agile teams to estimate story points collaboratively. Built with pure HTML, CSS, and JavaScript using P2P WebRTC technology and optional Firebase Realtime Database for cloud sessions. No external frameworks required.
+
 
 ## Features
 
-- **True Multi-user Sessions**: Real peer-to-peer collaboration across different browsers/devices
+- **True Multi-user Sessions**: Peer-to-peer or cloud collaboration across browsers/devices
 - **P2P WebRTC Communication**: Direct browser-to-browser connections with automatic fallback
+- **Firebase Cloud Sessions**: Use Firebase Realtime Database for persistent, multi-user sessions
 - **Fragment Sharing Fallback**: URL-based session sharing when WebRTC isn't available
 - **Task Management**: Add, select, and vote on user stories or tasks
 - **Standard Cards**: Classic planning poker values (1, 2, 3, 5, 8, 13, 21, ?, ☕)
 - **Host Controls**: Session host can manage tasks and control voting flow
 - **Responsive Design**: Works on desktop, tablet, and mobile devices
-- **No Backend Required**: Perfect for GitHub Pages hosting - completely serverless
+
 
 ## How to Use
+
 
 ### For Session Hosts
 
 1. **Create Session**: Enter your name and click "Create New Session"
 2. **Share Session**: Click "Share URL" to copy the session link for team members
-3. **Connection Method**: App automatically uses WebRTC P2P or falls back to URL sharing
+3. **Connection Method**: App automatically uses WebRTC P2P, Firebase, or URL sharing
 4. **Add Tasks**: Click "Add Task" to create user stories for estimation
 5. **Start Voting**: Click on a task to select it and enable voting
 6. **Reveal Results**: Once everyone has voted, click "Reveal Votes"
 7. **Next Round**: Click "Next Round" to clear votes and select another task
 
+
 ### For Participants
 
 1. **Join Session**: Click the shared URL or enter your name and session ID
-2. **Auto-Connect**: App automatically establishes P2P connection with host
+2. **Auto-Connect**: App automatically establishes P2P or Firebase connection with host
 3. **Wait for Task**: The host will select a task for estimation
 4. **Vote**: Click on a card to submit your estimate
 5. **View Results**: Once revealed, see all votes and discuss as needed
+
 
 ## Connection Methods
 
@@ -41,11 +47,27 @@ A real-time planning poker application for agile teams to estimate story points 
 - **Host relay**: Host acts as central relay for all participants
 - **Automatic**: Works transparently when browsers support WebRTC
 
+### Firebase Cloud Sessions (Production)
+- **Persistent cloud sessions**: Use Firebase Realtime Database for multi-user sessions
+- **Anonymous Authentication**: No sign-up required, but must be enabled in Firebase Console
+- **Production Database Rules**: You must set rules to allow only authenticated users to read/write:
+  ```json
+  {
+    "rules": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+  ```
+- **Session ID Format**: Session IDs must be 6 uppercase alphanumeric characters (A-Z, 0-9)
+- **Host/Participant Permissions**: Only the host can manage tasks and session info; users can only update their own participant and vote records
+
 ### Fragment Sharing (Fallback)
 - **URL-based**: Session state encoded in shareable URLs
 - **Manual sharing**: Host shares updated URLs when state changes
 - **Universal compatibility**: Works on any browser that supports modern JavaScript
 - **Compressed state**: Efficient URL encoding for large sessions
+
 
 ## Deployment
 
@@ -55,19 +77,29 @@ A real-time planning poker application for agile teams to estimate story points 
 3. Select source branch (usually `main` or `master`)
 4. Your app will be available at `https://yourusername.github.io/repository-name`
 
+### Firebase Production Setup
+1. Create a Firebase project at [firebase.google.com](https://firebase.google.com/)
+2. Enable Anonymous Authentication in the Firebase Console
+3. Set your Realtime Database rules for production (see above)
+4. Copy your Firebase config to `firebase-config.js`
+5. Deploy your app as usual
+
+
 ### Local Development
 1. Simply open `index.html` in a web browser
 2. For local testing with multiple users, open multiple browser tabs/windows
+
 
 ## Technical Details
 
 - **Pure JavaScript**: No external dependencies or frameworks
 - **WebRTC DataChannels**: Real peer-to-peer communication
+- **Firebase Realtime Database**: Cloud-based session management
 - **URL Fragment Encoding**: Compressed session state sharing
 - **Responsive CSS**: Mobile-first design with CSS Grid and Flexbox
 - **Cross-browser**: Compatible with modern browsers
 - **Accessible**: Keyboard navigation and screen reader friendly
-- **Dual Connection System**: WebRTC with fragment sharing fallback
+- **Dual Connection System**: WebRTC, Firebase, and fragment sharing fallback
 
 ## Browser Compatibility
 

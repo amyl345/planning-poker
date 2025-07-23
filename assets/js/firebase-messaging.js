@@ -168,7 +168,7 @@ class FirebaseMessaging {
         });
 
         // Write participants node (self only)
-        const participantRef = ref(this.participantsRef, this.userId);
+        const participantRef = ref(database, `sessions/${this.sessionId}/participants/${this.userId}`);
         await set(participantRef, {
             name: username,
             isHost: true,
