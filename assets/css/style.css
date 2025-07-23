@@ -257,6 +257,17 @@ textarea.form-control {
     background-color: var(--light);
 }
 
+.join-message {
+    padding: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+    background-color: var(--info-color);
+    color: var(--white);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    display: none;
+}
+
 /* Main App Layout */
 .main-app {
     display: grid;

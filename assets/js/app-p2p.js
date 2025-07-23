@@ -18,7 +18,8 @@ class PlanningPokerP2PApp {
         // Connection managers
         this.webrtcManager = null;
         this.fragmentManager = null;
-        this.connectionMode = 'none'; // 'webrtc', 'fragment', 'none'
+        this.crossBrowserMessaging = null;
+        this.connectionMode = 'none'; // 'cross-browser', 'fragment', 'none'
         
         this.init();
     }
@@ -95,12 +96,23 @@ class PlanningPokerP2PApp {
             if (state) {
                 this.connectionMode = 'fragment';
                 document.getElementById('sessionId').value = state.sessionId;
-                this.showJoinPrompt();
+                this.showAutoJoinPrompt(state);
+                return;
             }
         } else if (hash.startsWith('#session-')) {
             // Legacy format - convert to session ID
             const sessionId = hash.replace('#session-', '');
             document.getElementById('sessionId').value = sessionId;
+            this.showJoinPrompt();
+            return;
+        }
+        
+        // Check URL parameters as well (for ?session=ABC123 format)
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionParam = urlParams.get('session');
+        if (sessionParam) {
+            document.getElementById('sessionId').value = sessionParam;
+            this.showJoinPrompt();
         }
     }
 
@@ -110,8 +122,49 @@ class PlanningPokerP2PApp {
         const joinSection = sessionPanel.querySelector('.join-session');
         if (joinSection) {
             joinSection.style.border = '2px solid var(--primary-color)';
+            joinSection.style.backgroundColor = 'rgba(44, 90, 160, 0.05)';
             document.getElementById('username').focus();
         }
+        
+        // Show helpful message
+        this.showJoinMessage('Enter your name to join this session');
+    }
+    
+    showAutoJoinPrompt(sessionState) {
+        // Enhanced auto-join for sessions with full state
+        const sessionPanel = document.getElementById('sessionPanel');
+        const joinSection = sessionPanel.querySelector('.join-session');
+        if (joinSection) {
+            joinSection.style.border = '2px solid var(--success-color)';
+            joinSection.style.backgroundColor = 'rgba(16, 185, 129, 0.05)';
+            document.getElementById('username').focus();
+        }
+        
+        // Show session info
+        const participantCount = sessionState.participants ? sessionState.participants.size : 0;
+        const taskCount = sessionState.tasks ? sessionState.tasks.length : 0;
+        
+        this.showJoinMessage(
+            `Found active session with ${participantCount} participant${participantCount !== 1 ? 's' : ''} and ${taskCount} task${taskCount !== 1 ? 's' : ''}. Enter your name to join!`
+        );
+    }
+    
+    showJoinMessage(message) {
+        // Create or update join message element
+        let messageEl = document.getElementById('joinMessage');
+        if (!messageEl) {
+            messageEl = document.createElement('div');
+            messageEl.id = 'joinMessage';
+            messageEl.className = 'join-message';
+            
+            const joinSection = document.querySelector('.join-session');
+            if (joinSection) {
+                joinSection.insertBefore(messageEl, joinSection.firstChild);
+            }
+        }
+        
+        messageEl.textContent = message;
+        messageEl.style.display = 'block';
     }
 
     generateSessionId() {
@@ -147,25 +200,23 @@ class PlanningPokerP2PApp {
             createdAt: Date.now()
         };
 
-        // Try WebRTC first, fall back to fragment sharing
-        try {
-            if (this.webrtcManager.isWebRTCSupported) {
-                const shareURL = await this.webrtcManager.createHostSession(sessionId);
-                this.connectionMode = 'webrtc';
-                
-                // Simulate peer connections for demo (using localStorage messaging)
-                this.webrtcManager.simulateConnection('self');
-                
-                console.log('Created WebRTC session:', shareURL);
-            } else {
-                throw new Error('WebRTC not supported');
-            }
-        } catch (error) {
-            console.log('WebRTC failed, using fragment sharing:', error.message);
+        // Initialize cross-browser messaging
+        this.crossBrowserMessaging = new CrossBrowserMessaging(
+            sessionId,
+            (message) => this.handleCrossBrowserMessage(message),
+            (peerId, state) => this.handleConnectionChange(peerId, state)
+        );
+        
+        const success = this.crossBrowserMessaging.initializeAsHost(userId);
+        if (success) {
+            this.connectionMode = 'cross-browser';
+            console.log('Created cross-browser session:', sessionId);
+        } else {
+            // Fall back to fragment sharing
             this.connectionMode = 'fragment';
-            
             const initialState = this.getSessionState();
             this.fragmentManager.createSession(sessionId, initialState);
+            console.log('Fell back to fragment sharing');
         }
         
         this.showMainApp();
@@ -217,7 +268,7 @@ class PlanningPokerP2PApp {
         // Try to join via different methods
         let joinSuccessful = false;
 
-        // Try fragment sharing first if we have a URL
+        // Try fragment sharing first if we have a URL with state
         if (joinURL || this.fragmentManager.hasSessionInURL()) {
             try {
                 const success = this.fragmentManager.joinSession(joinURL || window.location.href);
@@ -231,21 +282,29 @@ class PlanningPokerP2PApp {
             }
         }
 
-        // Try WebRTC if fragment sharing didn't work
-        if (!joinSuccessful && this.webrtcManager.isWebRTCSupported) {
+        // Try cross-browser messaging if fragment sharing didn't work or for regular session IDs
+        if (!joinSuccessful) {
             try {
-                const success = await this.webrtcManager.joinSession(joinURL || `#session-${sessionId}`);
+                this.crossBrowserMessaging = new CrossBrowserMessaging(
+                    sessionId,
+                    (message) => this.handleCrossBrowserMessage(message),
+                    (peerId, state) => this.handleConnectionChange(peerId, state)
+                );
+                
+                const success = this.crossBrowserMessaging.initializeAsParticipant(userId);
                 if (success) {
-                    this.connectionMode = 'webrtc';
+                    this.connectionMode = 'cross-browser';
                     joinSuccessful = true;
                     
-                    // Simulate connection for demo
-                    this.webrtcManager.simulateConnection('host');
+                    // Request current state from host
+                    setTimeout(() => {
+                        this.crossBrowserMessaging.requestState();
+                    }, 1000);
                     
-                    console.log('Joined via WebRTC');
+                    console.log('Joined via cross-browser messaging');
                 }
             } catch (error) {
-                console.log('WebRTC join failed:', error.message);
+                console.log('Cross-browser messaging failed:', error.message);
             }
         }
 
@@ -276,6 +335,9 @@ class PlanningPokerP2PApp {
         }
 
         // Disconnect from P2P
+        if (this.crossBrowserMessaging) {
+            this.crossBrowserMessaging.disconnect();
+        }
         if (this.webrtcManager) {
             this.webrtcManager.disconnect();
         }
@@ -303,10 +365,20 @@ class PlanningPokerP2PApp {
         document.getElementById('sessionId').value = '';
     }
 
-    // Handle incoming P2P messages
+    // Handle incoming P2P messages (legacy WebRTC)
     handleP2PMessage(message) {
         console.log('Received P2P message:', message);
-        
+        this.processMessage(message);
+    }
+    
+    // Handle cross-browser messages
+    handleCrossBrowserMessage(message) {
+        console.log('Received cross-browser message:', message);
+        this.processMessage(message);
+    }
+    
+    // Process messages from any source
+    processMessage(message) {
         switch (message.type) {
             case 'user-joined':
                 this.handleUserJoined(message.user);
@@ -331,6 +403,12 @@ class PlanningPokerP2PApp {
                 break;
             case 'state-sync':
                 this.handleStateSync(message.state);
+                break;
+            case 'request-state-sync':
+                // System message requesting us to send state sync
+                if (this.isHost) {
+                    this.sendFullStateSync(message.targetUserId);
+                }
                 break;
         }
         
@@ -365,7 +443,9 @@ class PlanningPokerP2PApp {
 
     // Broadcast message to all connected peers
     broadcastMessage(message) {
-        if (this.connectionMode === 'webrtc') {
+        if (this.connectionMode === 'cross-browser') {
+            this.crossBrowserMessaging.broadcastMessage(message);
+        } else if (this.connectionMode === 'webrtc') {
             this.webrtcManager.broadcastMessage(message);
         } else if (this.connectionMode === 'fragment') {
             // For fragment sharing, we update the state and generate new URL
@@ -374,6 +454,37 @@ class PlanningPokerP2PApp {
             
             // Show the new URL to user for manual sharing
             this.showShareURL(shareURL);
+        }
+    }
+    
+    // Send full state sync to a specific user or all users
+    sendFullStateSync(targetUserId = null) {
+        if (!this.isHost) return;
+        
+        const fullState = {
+            sessionId: this.currentSession.id,
+            participants: Object.fromEntries(this.participants),
+            tasks: this.tasks,
+            currentTaskId: this.currentTaskId,
+            votes: Object.fromEntries(this.votes),
+            votingEnabled: this.votingEnabled,
+            votesRevealed: this.votesRevealed,
+            hostId: this.currentUser.id
+        };
+        
+        console.log('Sending full state sync:', fullState);
+        
+        if (this.connectionMode === 'cross-browser') {
+            this.crossBrowserMessaging.broadcastMessage({
+                type: 'state-sync',
+                state: fullState,
+                targetUserId: targetUserId
+            });
+        } else {
+            this.broadcastMessage({
+                type: 'state-sync',
+                state: fullState
+            });
         }
     }
 
@@ -436,13 +547,51 @@ class PlanningPokerP2PApp {
     }
 
     handleStateSync(state) {
+        console.log('Received state sync:', state);
+        
         // Update our state with the received state (from host)
-        this.participants = state.participants || new Map();
-        this.tasks = state.tasks || [];
-        this.currentTaskId = state.currentTaskId;
-        this.votes = state.votes || new Map();
-        this.votingEnabled = state.votingEnabled || false;
-        this.votesRevealed = state.votesRevealed || false;
+        if (state.participants) {
+            // Convert from object back to Map if needed
+            if (typeof state.participants === 'object' && !state.participants.has) {
+                this.participants = new Map(Object.entries(state.participants));
+            } else {
+                this.participants = state.participants;
+            }
+        }
+        
+        if (state.tasks) {
+            this.tasks = state.tasks;
+        }
+        
+        if (state.currentTaskId !== undefined) {
+            this.currentTaskId = state.currentTaskId;
+        }
+        
+        if (state.votes) {
+            // Convert from object back to Map if needed
+            if (typeof state.votes === 'object' && !state.votes.has) {
+                this.votes = new Map(Object.entries(state.votes));
+            } else {
+                this.votes = state.votes;
+            }
+        }
+        
+        if (state.votingEnabled !== undefined) {
+            this.votingEnabled = state.votingEnabled;
+        }
+        
+        if (state.votesRevealed !== undefined) {
+            this.votesRevealed = state.votesRevealed;
+        }
+        
+        console.log('State after sync:', {
+            participants: this.participants.size,
+            tasks: this.tasks.length,
+            currentTaskId: this.currentTaskId,
+            votes: this.votes.size,
+            votingEnabled: this.votingEnabled,
+            votesRevealed: this.votesRevealed
+        });
     }
 
     // UI Methods (same as before but adapted for P2P)
@@ -650,7 +799,10 @@ class PlanningPokerP2PApp {
         if (shareURLElement) {
             let shareURL = '';
             
-            if (this.connectionMode === 'webrtc') {
+            if (this.connectionMode === 'cross-browser') {
+                // For cross-browser mode, create simple session URL
+                shareURL = `${window.location.origin}${window.location.pathname}?session=${this.currentSession.id}`;
+            } else if (this.connectionMode === 'webrtc') {
                 shareURL = this.webrtcManager.generateSessionURL();
             } else if (this.connectionMode === 'fragment') {
                 shareURL = this.fragmentManager.generateShareableURL();
@@ -774,9 +926,15 @@ class PlanningPokerP2PApp {
     }
 
     copyShareURL() {
-        const shareURL = this.connectionMode === 'webrtc' 
-            ? this.webrtcManager.generateSessionURL()
-            : this.fragmentManager.generateShareableURL();
+        let shareURL = '';
+        
+        if (this.connectionMode === 'cross-browser') {
+            shareURL = `${window.location.origin}${window.location.pathname}?session=${this.currentSession.id}`;
+        } else if (this.connectionMode === 'webrtc') {
+            shareURL = this.webrtcManager.generateSessionURL();
+        } else if (this.connectionMode === 'fragment') {
+            shareURL = this.fragmentManager.generateShareableURL();
+        }
             
         if (shareURL) {
             navigator.clipboard.writeText(shareURL).then(() => {
