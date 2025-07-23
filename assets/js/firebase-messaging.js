@@ -251,7 +251,9 @@ class FirebaseMessaging {
 
         const votes = new Map();
         if (firebaseData.votes) {
-            Object.entries(firebaseData.votes).forEach(([userId, vote]) => {
+            Object.entries(firebaseData.votes).forEach(([userId, voteData]) => {
+                // Handle both old format (direct vote) and new format (object with value/timestamp)
+                const vote = typeof voteData === 'object' ? voteData.value : voteData;
                 votes.set(userId, vote);
             });
         }
@@ -300,7 +302,8 @@ class FirebaseMessaging {
             title: title,
             description: description,
             createdAt: serverTimestamp(),
-            createdBy: this.userId
+            createdBy: this.userId,
+            isActive: false
         };
 
         const newTaskRef = push(this.tasksRef);
@@ -331,7 +334,10 @@ class FirebaseMessaging {
     // Cast vote
     async castVote(vote) {
         const voteRef = ref(database, `sessions/${this.sessionId}/votes/${this.userId}`);
-        await set(voteRef, vote);
+        await set(voteRef, {
+            value: vote,
+            timestamp: serverTimestamp()
+        });
         console.log('Vote cast:', vote);
     }
 

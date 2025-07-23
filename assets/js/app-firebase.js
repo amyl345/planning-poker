@@ -37,13 +37,7 @@ class PlanningPokerFirebaseApp {
         document.getElementById('joinSessionBtn').addEventListener('click', () => this.joinSession());
         document.getElementById('leaveSessionBtn').addEventListener('click', () => this.leaveSession());
 
-        // Task management
-        document.getElementById('addTaskBtn').addEventListener('click', () => this.showTaskModal());
-        document.getElementById('saveTaskBtn').addEventListener('click', () => this.addTask());
-        document.getElementById('cancelTaskBtn').addEventListener('click', () => this.hideTaskModal());
-        document.getElementById('closeTaskModal').addEventListener('click', () => this.hideTaskModal());
-
-        // Voting
+        // Voting only
         document.querySelectorAll('.card-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.vote(e.target.dataset.value));
         });
@@ -53,22 +47,12 @@ class PlanningPokerFirebaseApp {
         // Share URL
         document.getElementById('shareURLBtn').addEventListener('click', () => this.copyShareURL());
 
-        // Modal close on background click
-        document.getElementById('taskModal').addEventListener('click', (e) => {
-            if (e.target.id === 'taskModal') {
-                this.hideTaskModal();
-            }
-        });
-
         // Enter key handling
         document.getElementById('username').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.handleEnterPress();
         });
         document.getElementById('sessionId').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.joinSession();
-        });
-        document.getElementById('taskTitle').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.addTask();
         });
     }
 
@@ -239,45 +223,22 @@ class PlanningPokerFirebaseApp {
             this.firebaseMessaging = null;
         }
 
-        // Reset state
-        this.currentUser = null;
-        this.currentSession = null;
-        this.isHost = false;
-        this.participants.clear();
-        this.tasks = [];
-        this.currentTaskId = null;
-        this.votes.clear();
-        this.votingEnabled = false;
-        this.votesRevealed = false;
-        
-        this.showSessionPanel();
-        this.updateConnectionStatus('disconnected');
-        
-        // Clear URL
-        window.history.replaceState(null, '', window.location.pathname);
-        
-        // Clear form fields
-        document.getElementById('username').value = '';
-        document.getElementById('sessionId').value = '';
-        
-        // Clear join message
-        const messageEl = document.getElementById('joinMessage');
-        if (messageEl) {
-            messageEl.style.display = 'none';
-        }
-    }
-
-    // Handle Firebase state changes
+    // Handle state changes from Firebase
     handleStateChange(state) {
         console.log('State change received:', state);
         
-        // Update local state
+        // Update local state with Firebase data
         this.participants = state.participants || new Map();
         this.tasks = state.tasks || [];
         this.currentTaskId = state.currentTaskId;
         this.votes = state.votes || new Map();
         this.votingEnabled = state.votingEnabled || false;
         this.votesRevealed = state.votesRevealed || false;
+        
+        // Update session info
+        if (state.sessionId) {
+            this.currentSession = { id: state.sessionId };
+        }
         
         // Update UI
         this.updateUI();
