@@ -225,12 +225,23 @@ class FirebaseMessaging {
         const sessionListener = onValue(this.sessionRef, (snapshot) => {
             if (snapshot.exists()) {
                 const sessionData = snapshot.val();
-                console.log('Session data updated:', sessionData);
+                console.log('[FirebaseMessaging] Session data updated:', {
+                    participantCount: sessionData.participants ? Object.keys(sessionData.participants).length : 0,
+                    participants: sessionData.participants ? Object.keys(sessionData.participants) : [],
+                    voteCount: sessionData.votes ? Object.keys(sessionData.votes).length : 0,
+                    info: sessionData.info
+                });
                 // Convert Firebase data to app format
                 const appState = this.convertFirebaseToAppState(sessionData);
+                console.log('[FirebaseMessaging] Converted app state:', {
+                    participantMapSize: appState.participants.size,
+                    participantIds: Array.from(appState.participants.keys()),
+                    voteMapSize: appState.votes.size,
+                    voteIds: Array.from(appState.votes.keys())
+                });
                 this.onStateChange(appState);
             } else {
-                console.warn('Session snapshot does not exist!');
+                console.warn('[FirebaseMessaging] Session snapshot does not exist!');
             }
         });
         this.listeners.push({ ref: this.sessionRef, listener: sessionListener });
@@ -256,10 +267,14 @@ class FirebaseMessaging {
 
         const votes = new Map();
         if (firebaseData.votes) {
+            console.log('[FirebaseMessaging] Processing votes data:', firebaseData.votes);
             Object.entries(firebaseData.votes).forEach(([userId, voteData]) => {
                 const vote = typeof voteData === 'object' ? voteData.value : voteData;
+                console.log(`[FirebaseMessaging] Vote for user ${userId}: ${vote} (raw:`, voteData, ')');
                 votes.set(userId, vote);
             });
+        } else {
+            console.log('[FirebaseMessaging] No votes data found in Firebase state');
         }
 
         return {

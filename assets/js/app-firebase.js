@@ -249,22 +249,14 @@ class PlanningPokerFirebaseApp {
         this.votingEnabled = state.votingEnabled !== false; // Default to true for simplified voting
         this.votesRevealed = state.votesRevealed || false;
         
-        // Defensive handling: Ensure current user (especially host) is in participants
+        // Log participant sync for debugging
+        console.log('Raw Firebase participants:', state.participants);
         if (this.currentUser) {
-            if (!this.participants.has(this.currentUser.id)) {
-                console.warn('Current user not found in participants, adding defensively:', this.currentUser);
-                this.participants.set(this.currentUser.id, {
-                    id: this.currentUser.id,
-                    name: this.currentUser.name,
-                    isHost: this.isHost,
-                    connected: true,
-                    lastSeen: Date.now()
-                });
-            } else {
-                console.log('Current user found in participants:', this.participants.get(this.currentUser.id));
+            const currentUserInParticipants = this.participants.has(this.currentUser.id);
+            console.log('Current user in participants:', currentUserInParticipants, this.currentUser.id);
+            if (!currentUserInParticipants) {	
+                console.warn('Current user missing from Firebase participants - this indicates a sync issue');
             }
-        } else {
-            console.warn('No current user set in handleStateChange');
         }
         
         console.log('Updated participants Map size:', this.participants.size);
@@ -386,7 +378,7 @@ class PlanningPokerFirebaseApp {
         
         for (let [id, participant] of this.participants) {
             const row = document.createElement('div');
-            row.className = 'table-row d-flex p-2 border-bottom';
+            row.className = 'table-row d-flex p-3 border-bottom align-items-center';
             
             const hasVoted = this.votes.has(id);
             const voteValue = this.votesRevealed ? (this.votes.get(id) || '-') : (hasVoted ? '✓' : '-');
@@ -394,16 +386,33 @@ class PlanningPokerFirebaseApp {
             const statusClass = participant.connected ? 'text-success' : 'text-muted';
             const hostBadge = participant.isHost ? '<span class="badge bg-primary ms-2">Host</span>' : '';
             
+            // Vote status indicator
+            let voteStatusBadge = '';
+            if (this.votesRevealed) {
+                voteStatusBadge = `<span class="badge bg-primary fs-6">${voteValue}</span>`;
+            } else if (hasVoted) {
+                voteStatusBadge = '<span class="badge bg-success">Voted</span>';
+            } else {
+                voteStatusBadge = '<span class="badge bg-warning text-dark">Waiting</span>';
+            }
+            
             row.innerHTML = `
-                <div class="col-4">
-                    <span class="fw-semibold">${participant.name}</span>
-                    ${hostBadge}
+                <div class="col-5">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-size: 14px;">
+                            ${participant.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <span class="fw-semibold">${participant.name}</span>
+                            ${hostBadge}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-3 text-center">
+                    <span class="badge ${participant.connected ? 'bg-success' : 'bg-secondary'}">${connectionStatus}</span>
                 </div>
                 <div class="col-4 text-center">
-                    <span class="${statusClass}">${connectionStatus}</span>
-                </div>
-                <div class="col-4 text-center">
-                    <span class="fw-bold">${voteValue}</span>
+                    ${voteStatusBadge}
                 </div>
             `;
             
@@ -429,13 +438,26 @@ class PlanningPokerFirebaseApp {
             return;
         }
         
-        // Update voting status - simplified without tasks
+        // Update voting status with progress
+        const connectedParticipants = Array.from(this.participants.values()).filter(p => p.connected);
+        const votedCount = connectedParticipants.filter(p => this.votes.has(p.id)).length;
+        const totalCount = connectedParticipants.length;
+        const progressPercent = totalCount > 0 ? Math.round((votedCount / totalCount) * 100) : 0;
+        
         if (this.votesRevealed) {
-            votingStatus.innerHTML = '<span class="status-text">Votes revealed! Check results below.</span>';
+            votingStatus.innerHTML = '<span class="status-text text-success"><i class="bi bi-check-circle me-2"></i>Votes revealed! Check results below.</span>';
             votingCards.style.opacity = '0.5';
         } else {
             const hasVoted = this.currentUser && this.votes.has(this.currentUser.id);
-            votingStatus.innerHTML = `<span class="status-text">${hasVoted ? 'Vote submitted!' : 'Cast your vote to estimate the story points'}</span>`;
+            votingStatus.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="status-text">${hasVoted ? 'Vote submitted!' : 'Cast your vote to estimate the story points'}</span>
+                    <small class="text-muted">${votedCount}/${totalCount} voted (${progressPercent}%)</small>
+                </div>
+                <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: ${progressPercent}%"></div>
+                </div>
+            `;
             votingCards.style.opacity = '1';
         }
         
@@ -449,7 +471,6 @@ class PlanningPokerFirebaseApp {
         });
         
         // Update host controls
-        const connectedParticipants = Array.from(this.participants.values()).filter(p => p.connected);
         const allVoted = connectedParticipants.length > 0 && 
                         connectedParticipants.every(p => this.votes.has(p.id));
         
@@ -474,33 +495,91 @@ class PlanningPokerFirebaseApp {
             resultsContent.innerHTML = '<p class="text-center text-muted">No votes yet</p>';
             return;
         }
+
+        // Calculate statistics
+        const voteValues = Array.from(this.votes.values());
+        const numericVotes = voteValues.filter(v => !isNaN(v) && v !== '?' && v !== '☕').map(Number);
         
-        // Count votes
-        const voteCounts = {};
-        for (let vote of this.votes.values()) {
-            voteCounts[vote] = (voteCounts[vote] || 0) + 1;
+        let stats = { high: null, low: null, average: null, consensus: false };
+        if (numericVotes.length > 0) {
+            stats.high = Math.max(...numericVotes);
+            stats.low = Math.min(...numericVotes);
+            stats.average = (numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length).toFixed(1);
         }
         
-        // Create results display
-        let resultsHTML = '<div class="vote-summary">';
+        // Check for consensus
+        const uniqueVotes = [...new Set(voteValues)];
+        stats.consensus = uniqueVotes.length === 1 && voteValues.length > 1;
+
+        let resultsHTML = '';
         
-        Object.entries(voteCounts).forEach(([value, count]) => {
+        // Statistics summary
+        if (numericVotes.length > 0) {
             resultsHTML += `
-                <div class="vote-result">
-                    <div class="vote-value">${value}</div>
-                    <div class="vote-count">${count} vote${count !== 1 ? 's' : ''}</div>
+                <div class="row mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="card text-center bg-light">
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-1">High</h6>
+                                <h4 class="text-danger mb-0">${stats.high}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card text-center bg-light">
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-1">Low</h6>
+                                <h4 class="text-success mb-0">${stats.low}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card text-center bg-light">
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-1">Average</h6>
+                                <h4 class="text-primary mb-0">${stats.average}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card text-center ${stats.consensus ? 'bg-success text-white' : 'bg-warning'}">
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-1">Consensus</h6>
+                                <h4 class="mb-0">${stats.consensus ? '✓' : '✗'}</h4>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
-        });
+        }
+        
+        // Individual votes
+        resultsHTML += '<h6 class="mb-3">Individual Votes:</h6><div class="row">';
+        
+        for (let [id, participant] of this.participants) {
+            const vote = this.votes.get(id) || 'No vote';
+            const badgeClass = participant.isHost ? 'bg-primary' : 'bg-secondary';
+            
+            resultsHTML += `
+                <div class="col-md-6 col-lg-4 mb-2">
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                        <span>
+                            ${participant.name}
+                            <span class="badge ${badgeClass} ms-1">${participant.isHost ? 'Host' : 'Member'}</span>
+                        </span>
+                        <strong class="text-primary fs-5">${vote}</strong>
+                    </div>
+                </div>
+            `;
+        }
         
         resultsHTML += '</div>';
         
-        // Add consensus detection
-        const uniqueVotes = Object.keys(voteCounts).length;
-        if (uniqueVotes === 1) {
-            resultsHTML += '<p class="text-center text-success"><strong>🎉 Consensus reached!</strong></p>';
-        } else {
-            resultsHTML += '<p class="text-center text-warning">Discussion needed - votes vary</p>';
+        // Consensus message
+        if (stats.consensus) {
+            resultsHTML += '<div class="alert alert-success text-center mt-3"><strong>🎉 Consensus reached!</strong></div>';
+        } else if (voteValues.length > 1) {
+            resultsHTML += '<div class="alert alert-warning text-center mt-3">Discussion needed - votes vary</div>';
         }
         
         resultsContent.innerHTML = resultsHTML;
@@ -511,6 +590,16 @@ class PlanningPokerFirebaseApp {
         console.log('Vote called with value:', value, 'votesRevealed:', this.votesRevealed, 'firebaseMessaging:', !!this.firebaseMessaging);
         if (this.votesRevealed || !this.firebaseMessaging) return;
         
+        // Check if user is changing their vote
+        const currentVote = this.currentUser ? this.votes.get(this.currentUser.id) : null;
+        if (currentVote && currentVote !== value) {
+            const changeConfirmed = confirm(`You already voted "${currentVote}". Do you want to change your vote to "${value}"?`);
+            if (!changeConfirmed) {
+                console.log('Vote change cancelled by user');
+                return;
+            }
+        }
+        
         // Show loading state
         this.showVoteLoading(value);
         
@@ -518,6 +607,9 @@ class PlanningPokerFirebaseApp {
             await this.firebaseMessaging.castVote(value);
             console.log('Vote cast successfully');
             this.showVoteSuccess(value);
+            
+            // Check if all participants have voted for auto-reveal
+            this.checkForAutoReveal();
         } catch (error) {
             console.error('Error casting vote:', error);
             this.showVoteError(value, error.message);
@@ -598,6 +690,26 @@ class PlanningPokerFirebaseApp {
         cardBtns.forEach(btn => {
             btn.disabled = this.votesRevealed;
         });
+    }
+
+    checkForAutoReveal() {
+        if (!this.isHost || this.votesRevealed) return;
+        
+        // Get connected participants
+        const connectedParticipants = Array.from(this.participants.values()).filter(p => p.connected);
+        console.log('Connected participants:', connectedParticipants.length);
+        console.log('Total votes:', this.votes.size);
+        
+        // Check if all connected participants have voted
+        const allVoted = connectedParticipants.length > 0 && 
+                        connectedParticipants.every(p => this.votes.has(p.id));
+        
+        if (allVoted) {
+            console.log('All participants have voted, auto-revealing votes');
+            setTimeout(() => {
+                this.revealVotes();
+            }, 1000); // Small delay for better UX
+        }
     }
 
     async revealVotes() {
