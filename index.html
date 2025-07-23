@@ -13,7 +13,8 @@
             <h1 class="title">Planning Poker</h1>
             <div class="session-info" id="sessionInfo" style="display: none;">
                 <span class="session-id">Session: <strong id="currentSessionId"></strong></span>
-                <span class="connection-status" id="connectionStatus">Connected</span>
+                <span class="connection-status" id="connectionStatus">Connecting...</span>
+                <span class="connection-mode" id="connectionMode">Firebase</span>
                 <button class="btn btn-primary" id="shareURLBtn">Share URL</button>
                 <button class="btn btn-secondary" id="leaveSessionBtn">Leave Session</button>
             </div>
@@ -150,9 +151,8 @@
         </div>
     </div>
 
-    <script src="assets/js/webrtc-manager.js"></script>
-    <script src="assets/js/fragment-sharing.js"></script>
-    <script src="assets/js/cross-browser-messaging.js"></script>
-    <script src="assets/js/app-p2p.js"></script>
+    <!-- Firebase Integration -->
+    <script type="module" src="assets/js/firebase-config.js"></script>
+    <script type="module" src="assets/js/app-firebase.js"></script>
 </body>
 </html>

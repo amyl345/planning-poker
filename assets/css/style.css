@@ -113,6 +113,15 @@ body {
     color: var(--white);
 }
 
+.connection-mode {
+    font-size: var(--font-size-sm);
+    padding: 0.25em 0.5em;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    background-color: var(--secondary-color);
+    color: var(--white);
+}
+
 /* Cards */
 .card {
     background: var(--white);
