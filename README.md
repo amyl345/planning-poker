@@ -1,34 +1,51 @@
-# Planning Poker Tool
+# Planning Poker Tool - P2P Edition
 
-A real-time planning poker application for agile teams to estimate story points collaboratively. Built with pure HTML, CSS, and JavaScript - no external frameworks required.
+A real-time planning poker application for agile teams to estimate story points collaboratively. Built with pure HTML, CSS, and JavaScript using P2P WebRTC technology - no external frameworks or backend servers required.
 
 ## Features
 
-- **Multi-user Sessions**: Create or join planning poker sessions with unique session IDs
-- **Real-time Collaboration**: Simulated real-time updates using localStorage polling
+- **True Multi-user Sessions**: Real peer-to-peer collaboration across different browsers/devices
+- **P2P WebRTC Communication**: Direct browser-to-browser connections with automatic fallback
+- **Fragment Sharing Fallback**: URL-based session sharing when WebRTC isn't available
 - **Task Management**: Add, select, and vote on user stories or tasks
 - **Standard Cards**: Classic planning poker values (1, 2, 3, 5, 8, 13, 21, ?, ☕)
 - **Host Controls**: Session host can manage tasks and control voting flow
 - **Responsive Design**: Works on desktop, tablet, and mobile devices
-- **No Backend Required**: Perfect for GitHub Pages hosting
+- **No Backend Required**: Perfect for GitHub Pages hosting - completely serverless
 
 ## How to Use
 
 ### For Session Hosts
 
 1. **Create Session**: Enter your name and click "Create New Session"
-2. **Share Session**: Copy the URL or share the session ID with team members
-3. **Add Tasks**: Click "Add Task" to create user stories for estimation
-4. **Start Voting**: Click on a task to select it and enable voting
-5. **Reveal Results**: Once everyone has voted, click "Reveal Votes"
-6. **Next Round**: Click "Next Round" to clear votes and select another task
+2. **Share Session**: Click "Share URL" to copy the session link for team members
+3. **Connection Method**: App automatically uses WebRTC P2P or falls back to URL sharing
+4. **Add Tasks**: Click "Add Task" to create user stories for estimation
+5. **Start Voting**: Click on a task to select it and enable voting
+6. **Reveal Results**: Once everyone has voted, click "Reveal Votes"
+7. **Next Round**: Click "Next Round" to clear votes and select another task
 
 ### For Participants
 
-1. **Join Session**: Enter your name and the session ID, then click "Join Session"
-2. **Wait for Task**: The host will select a task for estimation
-3. **Vote**: Click on a card to submit your estimate
-4. **View Results**: Once revealed, see all votes and discuss as needed
+1. **Join Session**: Click the shared URL or enter your name and session ID
+2. **Auto-Connect**: App automatically establishes P2P connection with host
+3. **Wait for Task**: The host will select a task for estimation
+4. **Vote**: Click on a card to submit your estimate
+5. **View Results**: Once revealed, see all votes and discuss as needed
+
+## Connection Methods
+
+### WebRTC P2P (Primary)
+- **Real-time sync**: Instant updates between all participants
+- **Direct connections**: Browser-to-browser communication
+- **Host relay**: Host acts as central relay for all participants
+- **Automatic**: Works transparently when browsers support WebRTC
+
+### Fragment Sharing (Fallback)
+- **URL-based**: Session state encoded in shareable URLs
+- **Manual sharing**: Host shares updated URLs when state changes
+- **Universal compatibility**: Works on any browser that supports modern JavaScript
+- **Compressed state**: Efficient URL encoding for large sessions
 
 ## Deployment
 
@@ -44,11 +61,13 @@ A real-time planning poker application for agile teams to estimate story points 
 
 ## Technical Details
 
-- **Pure JavaScript**: No external dependencies
-- **LocalStorage**: Used for session persistence and real-time simulation
+- **Pure JavaScript**: No external dependencies or frameworks
+- **WebRTC DataChannels**: Real peer-to-peer communication
+- **URL Fragment Encoding**: Compressed session state sharing
 - **Responsive CSS**: Mobile-first design with CSS Grid and Flexbox
 - **Cross-browser**: Compatible with modern browsers
 - **Accessible**: Keyboard navigation and screen reader friendly
+- **Dual Connection System**: WebRTC with fragment sharing fallback
 
 ## Browser Compatibility
 
@@ -59,7 +78,17 @@ A real-time planning poker application for agile teams to estimate story points 
 
 ## Session Management
 
-Sessions are stored in browser localStorage and automatically sync between participants every 2 seconds. Sessions persist until manually cleared or the browser cache is cleared.
+### WebRTC Mode
+- **P2P connections**: Direct browser-to-browser communication via WebRTC DataChannels
+- **Host relay**: Host browser acts as central relay for all participants
+- **Real-time sync**: Instant updates when votes, tasks, or state changes
+- **Auto-reconnect**: Handles connection drops and participant rejoining
+
+### Fragment Sharing Mode  
+- **URL encoding**: Session state compressed and encoded in shareable URLs
+- **Manual sync**: Host generates new URLs when state changes
+- **Universal compatibility**: Works without WebRTC support
+- **Persistent links**: URLs contain full session state for easy sharing
 
 ## Cards Explained
 

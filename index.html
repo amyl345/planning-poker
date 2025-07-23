@@ -13,6 +13,8 @@
             <h1 class="title">Planning Poker</h1>
             <div class="session-info" id="sessionInfo" style="display: none;">
                 <span class="session-id">Session: <strong id="currentSessionId"></strong></span>
+                <span class="connection-status" id="connectionStatus">Connected</span>
+                <button class="btn btn-primary" id="shareURLBtn">Share URL</button>
                 <button class="btn btn-secondary" id="leaveSessionBtn">Leave Session</button>
             </div>
         </header>
@@ -148,6 +150,8 @@
         </div>
     </div>
 
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/webrtc-manager.js"></script>
+    <script src="assets/js/fragment-sharing.js"></script>
+    <script src="assets/js/app-p2p.js"></script>
 </body>
 </html>

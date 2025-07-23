@@ -81,11 +81,36 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-4);
+    flex-wrap: wrap;
 }
 
 .session-id {
     font-size: var(--font-size-sm);
     color: var(--muted);
+}
+
+.connection-status {
+    font-size: var(--font-size-sm);
+    padding: 0.25em 0.5em;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+}
+
+.connection-status.connected,
+.connection-status.ready {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.connection-status.connecting {
+    background-color: var(--warning-color);
+    color: var(--dark);
+}
+
+.connection-status.disconnected,
+.connection-status.failed {
+    background-color: var(--danger-color);
+    color: var(--white);
 }
 
 /* Cards */
