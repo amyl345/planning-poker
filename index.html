@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning Poker Tool</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">Planning Poker</h1>
+            <div class="session-info" id="sessionInfo" style="display: none;">
+                <span class="session-id">Session: <strong id="currentSessionId"></strong></span>
+                <button class="btn btn-secondary" id="leaveSessionBtn">Leave Session</button>
+            </div>
+        </header>
+
+        <!-- Session Management Panel -->
+        <div class="panel" id="sessionPanel">
+            <div class="card">
+                <h2>Join or Create Session</h2>
+                <div class="form-group">
+                    <label for="username">Your Name</label>
+                    <input type="text" id="username" class="form-control" placeholder="Enter your name" required>
+                </div>
+                
+                <div class="session-actions">
+                    <div class="create-session">
+                        <button class="btn btn-primary" id="createSessionBtn">Create New Session</button>
+                    </div>
+                    
+                    <div class="join-session">
+                        <div class="form-group">
+                            <label for="sessionId">Session ID</label>
+                            <input type="text" id="sessionId" class="form-control" placeholder="Enter session ID">
+                        </div>
+                        <button class="btn btn-secondary" id="joinSessionBtn">Join Session</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Application (hidden until session joined) -->
+        <div class="main-app" id="mainApp" style="display: none;">
+            
+            <!-- Task Management Section -->
+            <div class="section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Tasks</h3>
+                        <button class="btn btn-primary" id="addTaskBtn">Add Task</button>
+                    </div>
+                    <div class="task-list" id="taskList">
+                        <div class="empty-state">No tasks yet. Add one to get started!</div>
+                    </div>
+                    <div class="current-task" id="currentTask" style="display: none;">
+                        <h4>Current Task:</h4>
+                        <div class="task-item active" id="currentTaskDisplay"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Participants Table -->
+            <div class="section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Participants</h3>
+                        <span class="participant-count" id="participantCount">0 participants</span>
+                    </div>
+                    <div class="participants-table">
+                        <div class="table-header">
+                            <div class="col">Name</div>
+                            <div class="col">Role</div>
+                            <div class="col">Status</div>
+                            <div class="col">Vote</div>
+                        </div>
+                        <div class="table-body" id="participantsBody">
+                            <!-- Participants will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voting Cards -->
+            <div class="section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Your Vote</h3>
+                        <div class="voting-status" id="votingStatus">
+                            <span class="status-text">Waiting for task selection...</span>
+                        </div>
+                    </div>
+                    <div class="voting-cards" id="votingCards">
+                        <button class="card-btn" data-value="1">1</button>
+                        <button class="card-btn" data-value="2">2</button>
+                        <button class="card-btn" data-value="3">3</button>
+                        <button class="card-btn" data-value="5">5</button>
+                        <button class="card-btn" data-value="8">8</button>
+                        <button class="card-btn" data-value="13">13</button>
+                        <button class="card-btn" data-value="21">21</button>
+                        <button class="card-btn" data-value="?">?</button>
+                        <button class="card-btn" data-value="☕">☕</button>
+                    </div>
+                    <div class="voting-actions">
+                        <button class="btn btn-success" id="revealVotesBtn" style="display: none;">Reveal Votes</button>
+                        <button class="btn btn-primary" id="nextRoundBtn" style="display: none;">Next Round</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Display -->
+            <div class="section" id="resultsSection" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Voting Results</h3>
+                    </div>
+                    <div class="results-content" id="resultsContent">
+                        <!-- Results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal" id="taskModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Task</h3>
+                <button class="close-btn" id="closeTaskModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="taskTitle">Task Title</label>
+                    <input type="text" id="taskTitle" class="form-control" placeholder="Enter task title" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Description (optional)</label>
+                    <textarea id="taskDescription" class="form-control" placeholder="Enter task description" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelTaskBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveTaskBtn">Add Task</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
