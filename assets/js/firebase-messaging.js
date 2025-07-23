@@ -3,7 +3,7 @@
  * Handles all Firebase Realtime Database operations for multi-user collaboration
  */
 
-import { database } from './firebase-config.js';
+import { database, auth } from './firebase-config.js';
 import { 
     ref, 
     set, 
@@ -15,6 +15,10 @@ import {
     onDisconnect,
     get 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { 
+    signInAnonymously,
+    onAuthStateChanged 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 class FirebaseMessaging {
     constructor(onStateChange, onConnectionChange) {
@@ -25,6 +29,7 @@ class FirebaseMessaging {
         this.userId = null;
         this.isHost = false;
         this.isConnected = false;
+        this.isAuthenticated = false;
         
         // Firebase references
         this.sessionRef = null;
@@ -38,6 +43,7 @@ class FirebaseMessaging {
         
         // Connection status
         this.setupConnectionMonitoring();
+        this.setupAuthStateListener();
     }
 
     // Setup connection monitoring
@@ -50,15 +56,52 @@ class FirebaseMessaging {
         });
     }
 
-    // Initialize as session host
-    async initializeAsHost(sessionId, userId, username) {
-        this.sessionId = sessionId;
-        this.userId = userId;
-        this.isHost = true;
-        
-        console.log('Initializing Firebase as host:', { sessionId, userId, username });
+    // Setup authentication state listener
+    setupAuthStateListener() {
+        onAuthStateChanged(auth, (user) => {
+            this.isAuthenticated = !!user;
+            if (user) {
+                console.log('User authenticated:', user.uid);
+                this.onConnectionChange('auth', 'authenticated');
+            } else {
+                console.log('User not authenticated');
+                this.onConnectionChange('auth', 'unauthenticated');
+            }
+        });
+    }
+
+    // Ensure user is authenticated
+    async ensureAuthenticated() {
+        if (auth.currentUser) {
+            return auth.currentUser;
+        }
+
+        console.log('Signing in anonymously...');
+        this.onConnectionChange('auth', 'authenticating');
         
         try {
+            const userCredential = await signInAnonymously(auth);
+            console.log('Anonymous sign-in successful:', userCredential.user.uid);
+            return userCredential.user;
+        } catch (error) {
+            console.error('Anonymous sign-in failed:', error);
+            this.onConnectionChange('auth', 'error');
+            throw error;
+        }
+    }
+
+    // Initialize as session host
+    async initializeAsHost(sessionId, username) {
+        this.sessionId = sessionId;
+        this.isHost = true;
+        
+        console.log('Initializing Firebase as host:', { sessionId, username });
+        
+        try {
+            // Ensure user is authenticated first
+            const user = await this.ensureAuthenticated();
+            this.userId = user.uid;
+            
             await this.setupSessionReferences();
             await this.createSession(username);
             this.setupRealtimeListeners();
@@ -73,14 +116,17 @@ class FirebaseMessaging {
     }
 
     // Initialize as participant
-    async initializeAsParticipant(sessionId, userId, username) {
+    async initializeAsParticipant(sessionId, username) {
         this.sessionId = sessionId;
-        this.userId = userId;
         this.isHost = false;
         
-        console.log('Initializing Firebase as participant:', { sessionId, userId, username });
+        console.log('Initializing Firebase as participant:', { sessionId, username });
         
         try {
+            // Ensure user is authenticated first
+            const user = await this.ensureAuthenticated();
+            this.userId = user.uid;
+            
             await this.setupSessionReferences();
             
             // Check if session exists

@@ -5,6 +5,7 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, connectDatabaseEmulator } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 // Firebase configuration from your project
 const firebaseConfig = {
@@ -25,6 +26,9 @@ const app = initializeApp(firebaseConfig);
 // Initialize Realtime Database
 const database = getDatabase(app);
 
+// Initialize Firebase Authentication
+const auth = getAuth(app);
+
 // Optional: Connect to emulator for local development
 // Uncomment the line below if you want to use Firebase emulator for testing
 // connectDatabaseEmulator(database, 'localhost', 9000);
@@ -32,8 +36,9 @@ const database = getDatabase(app);
 console.log('Firebase initialized successfully');
 
 // Export for use in other modules
-export { app, database };
+export { app, database, auth };
 
 // Make available globally for non-module scripts (if needed)
 window.firebaseApp = app;
 window.firebaseDatabase = database;
+window.firebaseAuth = auth;

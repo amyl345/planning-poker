@@ -20,6 +20,7 @@ class PlanningPokerFirebaseApp {
         // Firebase messaging
         this.firebaseMessaging = null;
         this.connectionStatus = 'disconnected';
+        this.authStatus = 'unauthenticated';
         
         this.init();
     }
@@ -132,9 +133,8 @@ class PlanningPokerFirebaseApp {
         return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
-    generateUserId() {
-        return 'user-' + Math.random().toString(36).substring(2, 9);
-    }
+    // User ID is now handled by Firebase Auth, so this method is not needed
+    // but keeping it for backwards compatibility in case it's referenced elsewhere
 
     async createSession() {
         const username = document.getElementById('username').value.trim();
@@ -146,18 +146,10 @@ class PlanningPokerFirebaseApp {
         this.updateConnectionStatus('connecting');
 
         const sessionId = this.generateSessionId();
-        const userId = this.generateUserId();
-        
-        this.currentUser = {
-            id: userId,
-            name: username,
-            isHost: true
-        };
         
         this.isHost = true;
         this.currentSession = {
             id: sessionId,
-            hostId: userId,
             createdAt: Date.now()
         };
 
@@ -168,8 +160,16 @@ class PlanningPokerFirebaseApp {
         );
 
         try {
-            const success = await this.firebaseMessaging.initializeAsHost(sessionId, userId, username);
+            const success = await this.firebaseMessaging.initializeAsHost(sessionId, username);
             if (success) {
+                // Update current user with Firebase auth UID
+                this.currentUser = {
+                    id: this.firebaseMessaging.userId,
+                    name: username,
+                    isHost: true
+                };
+                this.currentSession.hostId = this.firebaseMessaging.userId;
+                
                 this.showMainApp();
                 console.log('Session created successfully:', sessionId);
             } else {
@@ -177,8 +177,7 @@ class PlanningPokerFirebaseApp {
             }
         } catch (error) {
             console.error('Error creating session:', error);
-            alert('Failed to create session. Please try again.');
-            this.updateConnectionStatus('disconnected');
+            this.handleAuthError(error);
         }
     }
 
@@ -197,14 +196,6 @@ class PlanningPokerFirebaseApp {
         }
 
         this.updateConnectionStatus('connecting');
-
-        const userId = this.generateUserId();
-        
-        this.currentUser = {
-            id: userId,
-            name: username,
-            isHost: false
-        };
         
         this.isHost = false;
         this.currentSession = { id: sessionId };
@@ -216,8 +207,15 @@ class PlanningPokerFirebaseApp {
         );
 
         try {
-            const success = await this.firebaseMessaging.initializeAsParticipant(sessionId, userId, username);
+            const success = await this.firebaseMessaging.initializeAsParticipant(sessionId, username);
             if (success) {
+                // Update current user with Firebase auth UID
+                this.currentUser = {
+                    id: this.firebaseMessaging.userId,
+                    name: username,
+                    isHost: false
+                };
+                
                 this.showMainApp();
                 console.log('Joined session successfully:', sessionId);
             } else {
@@ -225,8 +223,7 @@ class PlanningPokerFirebaseApp {
             }
         } catch (error) {
             console.error('Error joining session:', error);
-            alert('Failed to join session. Please check the session ID and try again.');
-            this.updateConnectionStatus('disconnected');
+            this.handleAuthError(error);
         }
     }
 
@@ -283,22 +280,63 @@ class PlanningPokerFirebaseApp {
     // Handle connection changes
     handleConnectionChange(provider, status) {
         console.log('Connection change:', provider, status);
-        this.updateConnectionStatus(status);
+        
+        if (provider === 'auth') {
+            this.authStatus = status;
+        } else if (provider === 'firebase') {
+            this.connectionStatus = status;
+        }
+        
+        this.updateConnectionDisplay();
+    }
+
+    // Handle authentication errors
+    handleAuthError(error) {
+        let message = 'Authentication failed. ';
+        
+        if (error.code === 'auth/network-request-failed') {
+            message += 'Please check your internet connection.';
+        } else if (error.code === 'permission-denied') {
+            message += 'Database access denied. Please try again.';
+        } else if (error.message.includes('Session not found')) {
+            message = 'Session not found. Please check the session ID.';
+        } else {
+            message += 'Please try again.';
+        }
+        
+        alert(message);
+        this.updateConnectionStatus('disconnected');
     }
 
     updateConnectionStatus(status) {
         this.connectionStatus = status;
+        this.updateConnectionDisplay();
+    }
+
+    updateConnectionDisplay() {
         const statusElement = document.getElementById('connectionStatus');
         const modeElement = document.getElementById('connectionMode');
         
         if (statusElement) {
-            statusElement.textContent = this.getStatusText(status);
-            statusElement.className = `connection-status ${status}`;
+            const displayStatus = this.getOverallStatus();
+            statusElement.textContent = this.getStatusText(displayStatus);
+            statusElement.className = `connection-status ${displayStatus}`;
         }
         
         if (modeElement) {
             modeElement.textContent = 'Firebase';
         }
+    }
+
+    getOverallStatus() {
+        // Priority: auth errors > connection issues > normal states
+        if (this.authStatus === 'error') return 'failed';
+        if (this.authStatus === 'authenticating') return 'connecting';
+        if (this.authStatus === 'unauthenticated') return 'disconnected';
+        if (this.connectionStatus === 'disconnected') return 'disconnected';
+        if (this.connectionStatus === 'connecting') return 'connecting';
+        if (this.authStatus === 'authenticated' && this.connectionStatus === 'connected') return 'connected';
+        return 'connecting';
     }
 
     getStatusText(status) {
@@ -307,6 +345,7 @@ class PlanningPokerFirebaseApp {
             case 'connecting': return 'Connecting...';
             case 'disconnected': return 'Disconnected';
             case 'initializing': return 'Initializing...';
+            case 'failed': return 'Connection Failed';
             default: return status;
         }
     }
