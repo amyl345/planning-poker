@@ -1,158 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planning Poker Tool</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning Poker - Simple Voting</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <!-- Inter font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bs-primary: #0e1e32;
+      --bs-primary-rgb: 14, 30, 50;
+      --bs-body-bg: #f8f9fa;
+      --bs-body-color: #212529;
+      --bs-border-color: #dee2e6;
+      --canapii-bg-lighter: #f1f3f5;
+    }
+    body {
+      font-family: 'Inter', var(--bs-font-sans-serif);
+    }
+    .card-btn {
+      min-width: 60px;
+      min-height: 60px;
+      font-size: 1.5rem;
+      margin: 0.5rem;
+      border: 2px solid #dee2e6;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .card-btn:hover {
+      border-color: var(--bs-primary);
+      background-color: var(--bs-primary);
+      color: white;
+    }
+    .card-btn.selected {
+      border-color: var(--bs-primary);
+      background-color: var(--bs-primary);
+      color: white;
+    }
+    .session-id {
+      font-family: monospace;
+      font-size: 1.1rem;
+    }
+    .table-row {
+      display: flex;
+      padding: 0.5rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .table-row .col {
+      flex: 1;
+      padding: 0.25rem 0.5rem;
+    }
+  </style>
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1 class="title">Planning Poker</h1>
-            <div class="session-info" id="sessionInfo" style="display: none;">
-                <span class="session-id">Session: <strong id="currentSessionId"></strong></span>
-                <span class="connection-status" id="connectionStatus">Connecting...</span>
-                <span class="connection-mode" id="connectionMode">Firebase</span>
-                <button class="btn btn-primary" id="shareURLBtn">Share URL</button>
-                <button class="btn btn-secondary" id="leaveSessionBtn">Leave Session</button>
-            </div>
-        </header>
-
-        <!-- Session Management Panel -->
-        <div class="panel" id="sessionPanel">
-            <div class="card">
-                <h2>Join or Create Session</h2>
-                <div class="form-group">
-                    <label for="username">Your Name</label>
-                    <input type="text" id="username" class="form-control" placeholder="Enter your name" required>
-                </div>
-                
-                <div class="session-actions">
-                    <div class="create-session">
-                        <button class="btn btn-primary" id="createSessionBtn">Create New Session</button>
-                    </div>
-                    
-                    <div class="join-session">
-                        <div class="form-group">
-                            <label for="sessionId">Session ID</label>
-                            <input type="text" id="sessionId" class="form-control" placeholder="Enter session ID">
-                        </div>
-                        <button class="btn btn-secondary" id="joinSessionBtn">Join Session</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Application (hidden until session joined) -->
-        <div class="main-app" id="mainApp" style="display: none;">
+<body class="bg-light">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-md-10">
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h1 class="h3 mb-3 text-primary"><i class="bi bi-people me-2"></i>Planning Poker</h1>
             
-            <!-- Task Management Section -->
-            <div class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Tasks</h3>
-                        <button class="btn btn-primary" id="addTaskBtn">Add Task</button>
-                    </div>
-                    <div class="task-list" id="taskList">
-                        <div class="empty-state">No tasks yet. Add one to get started!</div>
-                    </div>
-                    <div class="current-task" id="currentTask" style="display: none;">
-                        <h4>Current Task:</h4>
-                        <div class="task-item active" id="currentTaskDisplay"></div>
-                    </div>
+            <!-- Session Management Panel -->
+            <div id="sessionPanel">
+              <form id="sessionForm" class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="username" class="form-label">Your Name</label>
+                  <input type="text" class="form-control" id="username" required maxlength="50">
                 </div>
+                <div class="col-md-6">
+                  <label for="sessionId" class="form-label">Session ID</label>
+                  <input type="text" class="form-control" id="sessionId" maxlength="6" pattern="[A-Z0-9]{6}" placeholder="e.g. ABC123">
+                  <div class="form-text">6 uppercase letters/numbers</div>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button type="button" class="btn btn-primary" id="createSessionBtn"><i class="bi bi-plus-circle me-1"></i>Create Session</button>
+                  <button type="button" class="btn btn-outline-primary" id="joinSessionBtn"><i class="bi bi-box-arrow-in-right me-1"></i>Join Session</button>
+                </div>
+              </form>
+              <div id="sessionMessage" class="text-danger small"></div>
             </div>
 
-            <!-- Participants Table -->
-            <div class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Participants</h3>
-                        <span class="participant-count" id="participantCount">0 participants</span>
-                    </div>
-                    <div class="participants-table">
-                        <div class="table-header">
-                            <div class="col">Name</div>
-                            <div class="col">Role</div>
-                            <div class="col">Status</div>
-                            <div class="col">Vote</div>
-                        </div>
-                        <div class="table-body" id="participantsBody">
-                            <!-- Participants will be added here dynamically -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Main Application (hidden until session joined) -->
+            <div id="mainApp" style="display: none;">
+              <!-- Session Info -->
+              <div class="mb-3">
+                <span class="fw-bold">Session ID:</span>
+                <span class="session-id" id="currentSessionId"></span>
+                <button class="btn btn-sm btn-outline-secondary ms-2" id="shareURLBtn" title="Copy session URL"><i class="bi bi-link-45deg"></i></button>
+                <button class="btn btn-sm btn-outline-danger ms-2" id="leaveSessionBtn"><i class="bi bi-box-arrow-left"></i> Leave</button>
+              </div>
 
-            <!-- Voting Cards -->
-            <div class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Your Vote</h3>
-                        <div class="voting-status" id="votingStatus">
-                            <span class="status-text">Waiting for task selection...</span>
-                        </div>
-                    </div>
-                    <div class="voting-cards" id="votingCards">
-                        <button class="card-btn" data-value="1">1</button>
-                        <button class="card-btn" data-value="2">2</button>
-                        <button class="card-btn" data-value="3">3</button>
-                        <button class="card-btn" data-value="5">5</button>
-                        <button class="card-btn" data-value="8">8</button>
-                        <button class="card-btn" data-value="13">13</button>
-                        <button class="card-btn" data-value="21">21</button>
-                        <button class="card-btn" data-value="?">?</button>
-                        <button class="card-btn" data-value="☕">☕</button>
-                    </div>
-                    <div class="voting-actions">
-                        <button class="btn btn-success" id="revealVotesBtn" style="display: none;">Reveal Votes</button>
-                        <button class="btn btn-primary" id="nextRoundBtn" style="display: none;">Next Round</button>
-                    </div>
+              <!-- Participants Table -->
+              <div class="card mb-4">
+                <div class="card-header">
+                  <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Participants</h5>
+                  <small class="text-muted" id="participantCount">0 participants</small>
                 </div>
-            </div>
+                <div class="card-body p-0">
+                  <div id="participantsBody">
+                    <!-- Participants will be rendered here by JS -->
+                  </div>
+                </div>
+              </div>
 
-            <!-- Results Display -->
-            <div class="section" id="resultsSection" style="display: none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Voting Results</h3>
-                    </div>
-                    <div class="results-content" id="resultsContent">
-                        <!-- Results will be displayed here -->
-                    </div>
+              <!-- Voting Cards -->
+              <div class="card mb-4">
+                <div class="card-header">
+                  <h5 class="mb-0"><i class="bi bi-card-list me-2"></i>Vote</h5>
+                  <div id="votingStatus" class="small text-muted">Cast your vote to estimate the story points</div>
                 </div>
+                <div class="card-body d-flex flex-wrap justify-content-center" id="votingCards">
+                  <button class="card-btn btn" data-value="1">1</button>
+                  <button class="card-btn btn" data-value="2">2</button>
+                  <button class="card-btn btn" data-value="3">3</button>
+                  <button class="card-btn btn" data-value="5">5</button>
+                  <button class="card-btn btn" data-value="8">8</button>
+                  <button class="card-btn btn" data-value="13">13</button>
+                  <button class="card-btn btn" data-value="21">21</button>
+                  <button class="card-btn btn" data-value="?">?</button>
+                  <button class="card-btn btn" data-value="☕">☕</button>
+                </div>
+                <div class="card-footer d-flex gap-2 justify-content-end">
+                  <button class="btn btn-success" id="revealVotesBtn"><i class="bi bi-eye me-1"></i>Reveal Votes</button>
+                  <button class="btn btn-secondary" id="nextRoundBtn"><i class="bi bi-arrow-repeat me-1"></i>Next Round</button>
+                </div>
+              </div>
+
+              <!-- Results Display -->
+              <div class="card mb-4" id="resultsSection" style="display: none;">
+                <div class="card-header"><h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Results</h5></div>
+                <div class="card-body" id="resultsContent">
+                  <!-- Results will be rendered here by JS -->
+                </div>
+              </div>
             </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Task Modal -->
-    <div class="modal" id="taskModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Add New Task</h3>
-                <button class="close-btn" id="closeTaskModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="taskTitle">Task Title</label>
-                    <input type="text" id="taskTitle" class="form-control" placeholder="Enter task title" required>
-                </div>
-                <div class="form-group">
-                    <label for="taskDescription">Description (optional)</label>
-                    <textarea id="taskDescription" class="form-control" placeholder="Enter task description" rows="3"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelTaskBtn">Cancel</button>
-                <button class="btn btn-primary" id="saveTaskBtn">Add Task</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase Integration -->
-    <script type="module" src="assets/js/firebase-config.js"></script>
-    <script type="module" src="assets/js/app-firebase.js"></script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Firebase Integration -->
+  <script type="module" src="assets/js/firebase-config.js"></script>
+  <script type="module" src="assets/js/app-firebase.js"></script>
 </body>
 </html>

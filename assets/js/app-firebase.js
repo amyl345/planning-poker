@@ -11,10 +11,8 @@ class PlanningPokerFirebaseApp {
         this.currentSession = null;
         this.isHost = false;
         this.participants = new Map();
-        this.tasks = [];
-        this.currentTaskId = null;
         this.votes = new Map();
-        this.votingEnabled = false;
+        this.votingEnabled = true; // Always enable voting for simplified app
         this.votesRevealed = false;
         
         // Firebase messaging
@@ -26,20 +24,25 @@ class PlanningPokerFirebaseApp {
     }
 
     init() {
+        console.log('Initializing app...');
         this.bindEvents();
         this.checkForSessionInURL();
         this.updateConnectionStatus('initializing');
+        console.log('App initialization complete');
     }
 
     bindEvents() {
+        console.log('Binding events...');
         // Session management
         document.getElementById('createSessionBtn').addEventListener('click', () => this.createSession());
         document.getElementById('joinSessionBtn').addEventListener('click', () => this.joinSession());
         document.getElementById('leaveSessionBtn').addEventListener('click', () => this.leaveSession());
 
-        // Voting only
-        document.querySelectorAll('.card-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.vote(e.target.dataset.value));
+        // Voting only - delegate event handling since cards are static now
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('card-btn')) {
+                this.vote(e.target.dataset.value);
+            }
         });
         document.getElementById('revealVotesBtn').addEventListener('click', () => this.revealVotes());
         document.getElementById('nextRoundBtn').addEventListener('click', () => this.nextRound());
@@ -54,6 +57,7 @@ class PlanningPokerFirebaseApp {
         document.getElementById('sessionId').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.joinSession();
         });
+        console.log('Event binding complete');
     }
 
     handleEnterPress() {
@@ -238,18 +242,16 @@ class PlanningPokerFirebaseApp {
     handleStateChange(state) {
         console.log('State change received:', state);
         console.log('Participants data:', state.participants);
-        console.log('Tasks data:', state.tasks);
         
         // Update local state with Firebase data
         this.participants = state.participants || new Map();
-        this.tasks = state.tasks || [];
-        this.currentTaskId = state.currentTaskId;
         this.votes = state.votes || new Map();
-        this.votingEnabled = state.votingEnabled || false;
+        this.votingEnabled = state.votingEnabled !== false; // Default to true for simplified voting
         this.votesRevealed = state.votesRevealed || false;
         
         console.log('Updated participants Map size:', this.participants.size);
-        console.log('Updated tasks array length:', this.tasks.length);
+        console.log('Updated votes Map size:', this.votes.size);
+        console.log('Voting enabled:', this.votingEnabled, 'Votes revealed:', this.votesRevealed);
         
         // Update session info
         if (state.sessionId) {
@@ -336,7 +338,6 @@ class PlanningPokerFirebaseApp {
     showMainApp() {
         document.getElementById('sessionPanel').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
-        document.getElementById('sessionInfo').style.display = 'flex';
         document.getElementById('currentSessionId').textContent = this.currentSession.id;
         
         this.updateUI();
@@ -345,7 +346,6 @@ class PlanningPokerFirebaseApp {
     showSessionPanel() {
         document.getElementById('sessionPanel').style.display = 'block';
         document.getElementById('mainApp').style.display = 'none';
-        document.getElementById('sessionInfo').style.display = 'none';
     }
 
     updateUI() {
@@ -354,54 +354,80 @@ class PlanningPokerFirebaseApp {
     }
 
     updateParticipantsTable() {
-        const table = document.querySelector('.participants-table');
-        if (!table) return;
-        table.innerHTML = '';
-        if (!this.participants || this.participants.size === 0) {
-            table.innerHTML = '<p>No participants yet.</p>';
+        console.log('updateParticipantsTable called, participants:', this.participants);
+        const tbody = document.getElementById('participantsBody');
+        const count = document.getElementById('participantCount');
+        
+        if (!tbody || !count) {
+            console.error('Missing participantsBody or participantCount elements');
             return;
         }
-        const html = Array.from(this.participants.values()).map(p => {
-            const status = p.connected ? '🟢 Connected' : '🔴 Disconnected';
-            return `<div class="participant-row"><span>${p.name}</span> <span>${status}</span></div>`;
-        }).join('');
-        table.innerHTML = html;
+        
+        tbody.innerHTML = '';
+        count.textContent = `${this.participants.size} participant${this.participants.size !== 1 ? 's' : ''}`;
+        
+        for (let [id, participant] of this.participants) {
+            const row = document.createElement('div');
+            row.className = 'table-row d-flex p-2 border-bottom';
+            
+            const hasVoted = this.votes.has(id);
+            const voteValue = this.votesRevealed ? (this.votes.get(id) || '-') : (hasVoted ? '✓' : '-');
+            const connectionStatus = participant.connected ? 'Online' : 'Offline';
+            const statusClass = participant.connected ? 'text-success' : 'text-muted';
+            const hostBadge = participant.isHost ? '<span class="badge bg-primary ms-2">Host</span>' : '';
+            
+            row.innerHTML = `
+                <div class="col-4">
+                    <span class="fw-semibold">${participant.name}</span>
+                    ${hostBadge}
+                </div>
+                <div class="col-4 text-center">
+                    <span class="${statusClass}">${connectionStatus}</span>
+                </div>
+                <div class="col-4 text-center">
+                    <span class="fw-bold">${voteValue}</span>
+                </div>
+            `;
+            
+            tbody.appendChild(row);
+        }
+        console.log('Participants table updated with', this.participants.size, 'participants');
     }
 
     updateTaskList() {
-        // Task management removed. No task list or add task button.
+        // Task management removed for simplified voting app
     }
 
     updateVotingInterface() {
+        console.log('updateVotingInterface called, votingEnabled:', this.votingEnabled, 'votesRevealed:', this.votesRevealed);
         const votingCards = document.getElementById('votingCards');
         const votingStatus = document.getElementById('votingStatus');
         const revealBtn = document.getElementById('revealVotesBtn');
         const nextRoundBtn = document.getElementById('nextRoundBtn');
         const resultsSection = document.getElementById('resultsSection');
         
-        // Update voting status
-        if (!this.currentTaskId) {
-            votingStatus.innerHTML = '<span class="status-text">Waiting for task selection...</span>';
-            votingCards.style.opacity = '0.5';
-        } else if (!this.votingEnabled) {
-            votingStatus.innerHTML = '<span class="status-text">Voting not started yet</span>';
-            votingCards.style.opacity = '0.5';
-        } else if (this.votesRevealed) {
+        if (!votingCards || !votingStatus || !revealBtn || !nextRoundBtn || !resultsSection) {
+            console.error('Missing voting interface elements');
+            return;
+        }
+        
+        // Update voting status - simplified without tasks
+        if (this.votesRevealed) {
             votingStatus.innerHTML = '<span class="status-text">Votes revealed! Check results below.</span>';
             votingCards.style.opacity = '0.5';
         } else {
-            const hasVoted = this.votes.has(this.currentUser.id);
-            votingStatus.innerHTML = `<span class="status-text">${hasVoted ? 'Vote submitted!' : 'Select your estimate'}</span>`;
+            const hasVoted = this.currentUser && this.votes.has(this.currentUser.id);
+            votingStatus.innerHTML = `<span class="status-text">${hasVoted ? 'Vote submitted!' : 'Cast your vote to estimate the story points'}</span>`;
             votingCards.style.opacity = '1';
         }
         
         // Update card buttons
         const cardBtns = document.querySelectorAll('.card-btn');
-        const userVote = this.votes.get(this.currentUser.id);
+        const userVote = this.currentUser ? this.votes.get(this.currentUser.id) : null;
         
         cardBtns.forEach(btn => {
             btn.classList.toggle('selected', btn.dataset.value === userVote);
-            btn.disabled = !this.votingEnabled || this.votesRevealed || !this.currentTaskId;
+            btn.disabled = this.votesRevealed;
         });
         
         // Update host controls
@@ -409,7 +435,7 @@ class PlanningPokerFirebaseApp {
         const allVoted = connectedParticipants.length > 0 && 
                         connectedParticipants.every(p => this.votes.has(p.id));
         
-        revealBtn.style.display = (this.isHost && this.votingEnabled && !this.votesRevealed && allVoted) ? 'block' : 'none';
+        revealBtn.style.display = (this.isHost && !this.votesRevealed && allVoted) ? 'block' : 'none';
         nextRoundBtn.style.display = (this.isHost && this.votesRevealed) ? 'block' : 'none';
         
         // Show/hide results
@@ -419,6 +445,8 @@ class PlanningPokerFirebaseApp {
         } else {
             resultsSection.style.display = 'none';
         }
+        
+        console.log('Voting interface updated - cards enabled:', !this.votesRevealed, 'buttons count:', cardBtns.length);
     }
 
     updateResults() {
@@ -460,52 +488,14 @@ class PlanningPokerFirebaseApp {
         resultsContent.innerHTML = resultsHTML;
     }
 
-    // Action methods
-    showTaskModal() {
-        document.getElementById('taskModal').style.display = 'flex';
-        document.getElementById('taskTitle').focus();
-    }
-
-    hideTaskModal() {
-        document.getElementById('taskModal').style.display = 'none';
-        document.getElementById('taskTitle').value = '';
-        document.getElementById('taskDescription').value = '';
-    }
-
-    async addTask() {
-        const title = document.getElementById('taskTitle').value.trim();
-        if (!title) {
-            alert('Please enter a task title');
-            return;
-        }
-        
-        const description = document.getElementById('taskDescription').value.trim();
-        
-        try {
-            await this.firebaseMessaging.addTask(title, description);
-            this.hideTaskModal();
-        } catch (error) {
-            console.error('Error adding task:', error);
-            alert('Failed to add task. Please try again.');
-        }
-    }
-
-    async selectTask(taskId) {
-        if (!this.isHost) return;
-        
-        try {
-            await this.firebaseMessaging.selectTask(taskId);
-        } catch (error) {
-            console.error('Error selecting task:', error);
-            alert('Failed to select task. Please try again.');
-        }
-    }
-
+    // Action methods - voting only
     async vote(value) {
-        if (!this.votingEnabled || this.votesRevealed || !this.currentTaskId) return;
+        console.log('Vote called with value:', value, 'votesRevealed:', this.votesRevealed, 'firebaseMessaging:', !!this.firebaseMessaging);
+        if (this.votesRevealed || !this.firebaseMessaging) return;
         
         try {
             await this.firebaseMessaging.castVote(value);
+            console.log('Vote cast successfully');
         } catch (error) {
             console.error('Error casting vote:', error);
             alert('Failed to cast vote. Please try again.');
@@ -557,5 +547,7 @@ class PlanningPokerFirebaseApp {
 
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing PlanningPokerFirebaseApp...');
     window.planningPoker = new PlanningPokerFirebaseApp();
+    console.log('App initialized:', window.planningPoker);
 });

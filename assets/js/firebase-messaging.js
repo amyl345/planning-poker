@@ -93,58 +93,63 @@ class FirebaseMessaging {
 
     // Initialize as session host
     async initializeAsHost(sessionId, username) {
+        // Validate session ID format
+        if (!/^[A-Z0-9]{6}$/.test(sessionId)) {
+            throw new Error('Session ID must be 6 uppercase alphanumeric characters');
+        }
         this.sessionId = sessionId;
         this.isHost = true;
-        
         console.log('Initializing Firebase as host:', { sessionId, username });
-        
         try {
             // Ensure user is authenticated first
             const user = await this.ensureAuthenticated();
             this.userId = user.uid;
-            
             await this.setupSessionReferences();
+            // HostId must match auth.uid
             await this.createSession(username);
             this.setupRealtimeListeners();
             this.setupDisconnectionHandling();
-            
             console.log('Host initialization complete');
             return true;
         } catch (error) {
             console.error('Error initializing as host:', error);
-            return false;
+            throw error;
         }
     }
 
     // Initialize as participant
     async initializeAsParticipant(sessionId, username) {
+        // Validate session ID format
+        if (!/^[A-Z0-9]{6}$/.test(sessionId)) {
+            throw new Error('Session ID must be 6 uppercase alphanumeric characters');
+        }
         this.sessionId = sessionId;
         this.isHost = false;
-        
         console.log('Initializing Firebase as participant:', { sessionId, username });
-        
         try {
             // Ensure user is authenticated first
             const user = await this.ensureAuthenticated();
             this.userId = user.uid;
-            
             await this.setupSessionReferences();
-            
             // Check if session exists
             const sessionSnapshot = await get(this.sessionRef);
             if (!sessionSnapshot.exists()) {
                 throw new Error('Session not found');
             }
-            
-            await this.joinSession(username);
+            // Try to join session
+            try {
+                await this.joinSession(username);
+            } catch (err) {
+                console.error('Error writing participant record:', err);
+                throw err;
+            }
             this.setupRealtimeListeners();
             this.setupDisconnectionHandling();
-            
             console.log('Participant initialization complete');
             return true;
         } catch (error) {
             console.error('Error initializing as participant:', error);
-            return false;
+            throw error;
         }
     }
 
@@ -164,12 +169,17 @@ class FirebaseMessaging {
             hostId: this.userId,
             createdAt: serverTimestamp(),
             currentTaskId: null,
-            votingEnabled: false,
+            votingEnabled: true,
             votesRevealed: false
         });
 
         // Write participants node (self only)
         const participantRef = ref(database, `sessions/${this.sessionId}/participants/${this.userId}`);
+        console.log('[FirebaseMessaging] Host creating participant:', {
+            path: `sessions/${this.sessionId}/participants/${this.userId}`,
+            authUid: this.userId,
+            username
+        });
         await set(participantRef, {
             name: username,
             isHost: true,
@@ -177,20 +187,18 @@ class FirebaseMessaging {
             lastSeen: serverTimestamp(),
             connected: true
         });
-
-        // Write empty tasks node (host only)
-        await set(this.tasksRef, {});
-
-        // Write empty votes node (host only)
-        await set(this.votesRef, {});
-
-        console.log('Session created successfully');
+        console.log('[FirebaseMessaging] Host participant created:', username, this.userId);
     }
 
     // Join existing session (participant)
     async joinSession(username) {
+        // Add self to participants node
         const participantRef = ref(database, `sessions/${this.sessionId}/participants/${this.userId}`);
-        
+        console.log('[FirebaseMessaging] Participant joining:', {
+            path: `sessions/${this.sessionId}/participants/${this.userId}`,
+            authUid: this.userId,
+            username
+        });
         await set(participantRef, {
             name: username,
             isHost: false,
@@ -198,8 +206,7 @@ class FirebaseMessaging {
             lastSeen: serverTimestamp(),
             connected: true
         });
-        
-        console.log('Joined session successfully');
+        console.log('[FirebaseMessaging] Participant joined:', username, this.userId);
     }
 
     // Setup real-time listeners
@@ -209,13 +216,13 @@ class FirebaseMessaging {
             if (snapshot.exists()) {
                 const sessionData = snapshot.val();
                 console.log('Session data updated:', sessionData);
-                
                 // Convert Firebase data to app format
                 const appState = this.convertFirebaseToAppState(sessionData);
                 this.onStateChange(appState);
+            } else {
+                console.warn('Session snapshot does not exist!');
             }
         });
-        
         this.listeners.push({ ref: this.sessionRef, listener: sessionListener });
     }
 
@@ -227,33 +234,19 @@ class FirebaseMessaging {
                 participants.set(id, {
                     id: id,
                     name: data.name,
-                    isHost: data.isHost || false,
-                    connected: data.connected || false,
-                    lastSeen: data.lastSeen
+                    isHost: !!data.isHost,
+                    connected: !!data.connected,
+                    lastSeen: data.lastSeen || null
                 });
             });
         }
 
+        // No tasks for simplified app
         const tasks = [];
-        if (firebaseData.tasks) {
-            Object.entries(firebaseData.tasks).forEach(([id, data]) => {
-                tasks.push({
-                    id: id,
-                    title: data.title,
-                    description: data.description || '',
-                    createdAt: data.createdAt,
-                    createdBy: data.createdBy
-                });
-            });
-            
-            // Sort tasks by creation time
-            tasks.sort((a, b) => a.createdAt - b.createdAt);
-        }
 
         const votes = new Map();
         if (firebaseData.votes) {
             Object.entries(firebaseData.votes).forEach(([userId, voteData]) => {
-                // Handle both old format (direct vote) and new format (object with value/timestamp)
                 const vote = typeof voteData === 'object' ? voteData.value : voteData;
                 votes.set(userId, vote);
             });
@@ -263,11 +256,11 @@ class FirebaseMessaging {
             sessionId: this.sessionId,
             participants: participants,
             tasks: tasks,
-            currentTaskId: firebaseData.info?.currentTaskId || null,
+            currentTaskId: null,
             votes: votes,
-            votingEnabled: firebaseData.info?.votingEnabled || false,
-            votesRevealed: firebaseData.info?.votesRevealed || false,
-            hostId: firebaseData.info?.hostId
+            votingEnabled: firebaseData.info?.votingEnabled ?? true,
+            votesRevealed: firebaseData.info?.votesRevealed ?? false,
+            hostId: firebaseData.info?.hostId ?? null
         };
     }
 
@@ -334,12 +327,30 @@ class FirebaseMessaging {
 
     // Cast vote
     async castVote(vote) {
+        const allowedVotes = ['1','2','3','5','8','13','21','?','☕'];
+        if (!allowedVotes.includes(vote)) {
+            console.error('[FirebaseMessaging] Invalid vote value:', vote);
+            throw new Error('Invalid vote value');
+        }
+        if (!this.sessionId || !this.userId) {
+            console.warn('[FirebaseMessaging] Cannot cast vote, missing sessionId or userId', {
+                sessionId: this.sessionId,
+                userId: this.userId
+            });
+            return;
+        }
         const voteRef = ref(database, `sessions/${this.sessionId}/votes/${this.userId}`);
-        await set(voteRef, {
-            value: vote,
-            timestamp: serverTimestamp()
-        });
-        console.log('Vote cast:', vote);
+        console.log('[FirebaseMessaging] Casting vote:', vote, 'for session:', this.sessionId, 'by user:', this.userId);
+        try {
+            await set(voteRef, {
+                value: vote,
+                timestamp: serverTimestamp()
+            });
+            console.log('[FirebaseMessaging] Vote cast:', vote, 'by', this.userId);
+        } catch (error) {
+            console.error('[FirebaseMessaging] Error casting vote:', error);
+            throw error;
+        }
     }
 
     // Reveal votes (host only)
@@ -362,13 +373,13 @@ class FirebaseMessaging {
 
         const updates = {
             'info/currentTaskId': null,
-            'info/votingEnabled': false,
+            'info/votingEnabled': true,
             'info/votesRevealed': false,
             'votes': {} // Clear all votes
         };
 
         const sessionRef = ref(database, `sessions/${this.sessionId}`);
-        await set(sessionRef, updates);
+        await update(sessionRef, updates);
         console.log('Next round started');
     }
 

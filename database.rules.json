@@ -2,13 +2,10 @@
   "rules": {
     "sessions": {
       "$sessionId": {
-        // Session ID must be 6 uppercase alphanumeric characters
         ".validate": "$sessionId.matches(/^[A-Z0-9]{6}$/)",
         
         "info": {
-          // Only authenticated users can read session info
           ".read": "auth != null",
-          // Host can write to session info (existing session) OR anyone can create if hostId matches their auth.uid
           ".write": "auth != null && ((!data.exists() && newData.child('hostId').val() == auth.uid) || (data.exists() && data.child('hostId').val() == auth.uid))",
           
           "hostId": {
@@ -29,11 +26,9 @@
         },
         
         "participants": {
-          // Anyone can read participants list
           ".read": "auth != null",
           
           "$userId": {
-            // Users can only write their own participant data
             ".write": "auth != null && $userId == auth.uid",
             
             "name": {
@@ -55,9 +50,7 @@
         },
         
         "tasks": {
-          // Anyone can read tasks
           ".read": "auth != null",
-          // Only the session host can write tasks
           ".write": "auth != null && root.child('sessions').child($sessionId).child('info').child('hostId').val() == auth.uid",
           
           "$taskId": {
@@ -77,13 +70,10 @@
         },
         
         "votes": {
-          // Anyone can read votes (but only when revealed by host logic in app)
           ".read": "auth != null",
-          // Host can write to initialize empty votes node or individual users can write their own votes
-          ".write": "auth != null && root.child('sessions').child($sessionId).child('info').child('hostId').val() == auth.uid",
+          ".write": "auth != null",
           
           "$userId": {
-            // Users can only write their own votes
             ".write": "auth != null && $userId == auth.uid",
             
             "value": {
@@ -97,7 +87,6 @@
       }
     },
     
-    // Deny access to any other paths
     "$other": {
       ".read": false,
       ".write": false
