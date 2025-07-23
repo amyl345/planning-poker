@@ -80,9 +80,32 @@ A real-time planning poker application for agile teams to estimate story points 
 ### Firebase Production Setup
 1. Create a Firebase project at [firebase.google.com](https://firebase.google.com/)
 2. Enable Anonymous Authentication in the Firebase Console
-3. Set your Realtime Database rules for production (see above)
-4. Copy your Firebase config to `firebase-config.js`
+3. Copy your Firebase config to `firebase-config.js`
+4. **Deploy Firebase Security Rules** (Required - choose one method):
+
+   **Method A: Using Firebase CLI (Recommended)**
+   ```bash
+   # Install Firebase CLI
+   npm install -g firebase-tools
+   
+   # Login to Firebase
+   firebase login
+   
+   # Initialize Firebase in your project directory
+   firebase init database
+   
+   # Deploy the security rules
+   firebase deploy --only database
+   ```
+   
+   **Method B: Manual via Firebase Console**
+   - Go to your Firebase Console → Realtime Database → Rules
+   - Copy the contents of `database.rules.json` into the rules editor
+   - Click "Publish" to deploy the rules
+
 5. Deploy your app as usual
+
+**Important**: The security rules in `database.rules.json` are required for the app to function. Without proper rules, you'll get "PERMISSION_DENIED" errors when creating sessions.
 
 
 ### Local Development
