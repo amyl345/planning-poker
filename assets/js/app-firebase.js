@@ -222,10 +222,13 @@ class PlanningPokerFirebaseApp {
             await this.firebaseMessaging.disconnect();
             this.firebaseMessaging = null;
         }
+    }
 
     // Handle state changes from Firebase
     handleStateChange(state) {
         console.log('State change received:', state);
+        console.log('Participants data:', state.participants);
+        console.log('Tasks data:', state.tasks);
         
         // Update local state with Firebase data
         this.participants = state.participants || new Map();
@@ -234,6 +237,9 @@ class PlanningPokerFirebaseApp {
         this.votes = state.votes || new Map();
         this.votingEnabled = state.votingEnabled || false;
         this.votesRevealed = state.votesRevealed || false;
+        
+        console.log('Updated participants Map size:', this.participants.size);
+        console.log('Updated tasks array length:', this.tasks.length);
         
         // Update session info
         if (state.sessionId) {

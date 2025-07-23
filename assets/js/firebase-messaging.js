@@ -13,7 +13,8 @@ import {
     off, 
     serverTimestamp, 
     onDisconnect,
-    get 
+    get,
+    update 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { 
     signInAnonymously,
@@ -327,7 +328,7 @@ class FirebaseMessaging {
             'votes': {} // Clear all votes
         };
 
-        await set(ref(database, `sessions/${this.sessionId}`), updates);
+        await update(ref(database, `sessions/${this.sessionId}`), updates);
         console.log('Task selected for voting:', taskId);
     }
 
