@@ -130,7 +130,13 @@ class PlanningPokerFirebaseApp {
     }
 
     generateSessionId() {
-        return Math.random().toString(36).substring(2, 8).toUpperCase();
+        // Generate a 6-character uppercase alphanumeric session ID
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let id = '';
+        for (let i = 0; i < 6; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return id;
     }
 
     // User ID is now handled by Firebase Auth, so this method is not needed
