@@ -249,6 +249,24 @@ class PlanningPokerFirebaseApp {
         this.votingEnabled = state.votingEnabled !== false; // Default to true for simplified voting
         this.votesRevealed = state.votesRevealed || false;
         
+        // Defensive handling: Ensure current user (especially host) is in participants
+        if (this.currentUser) {
+            if (!this.participants.has(this.currentUser.id)) {
+                console.warn('Current user not found in participants, adding defensively:', this.currentUser);
+                this.participants.set(this.currentUser.id, {
+                    id: this.currentUser.id,
+                    name: this.currentUser.name,
+                    isHost: this.isHost,
+                    connected: true,
+                    lastSeen: Date.now()
+                });
+            } else {
+                console.log('Current user found in participants:', this.participants.get(this.currentUser.id));
+            }
+        } else {
+            console.warn('No current user set in handleStateChange');
+        }
+        
         console.log('Updated participants Map size:', this.participants.size);
         console.log('Updated votes Map size:', this.votes.size);
         console.log('Voting enabled:', this.votingEnabled, 'Votes revealed:', this.votesRevealed);
@@ -493,13 +511,93 @@ class PlanningPokerFirebaseApp {
         console.log('Vote called with value:', value, 'votesRevealed:', this.votesRevealed, 'firebaseMessaging:', !!this.firebaseMessaging);
         if (this.votesRevealed || !this.firebaseMessaging) return;
         
+        // Show loading state
+        this.showVoteLoading(value);
+        
         try {
             await this.firebaseMessaging.castVote(value);
             console.log('Vote cast successfully');
+            this.showVoteSuccess(value);
         } catch (error) {
             console.error('Error casting vote:', error);
-            alert('Failed to cast vote. Please try again.');
+            this.showVoteError(value, error.message);
         }
+    }
+
+    showVoteLoading(value) {
+        const btn = document.querySelector(`.card-btn[data-value="${value}"]`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="spinner-border spinner-border-sm" role="status"></i>';
+            btn.classList.add('loading');
+        }
+        
+        const votingStatus = document.getElementById('votingStatus');
+        if (votingStatus) {
+            votingStatus.innerHTML = '<span class="text-info">Casting vote...</span>';
+        }
+    }
+
+    showVoteSuccess(value) {
+        const btn = document.querySelector(`.card-btn[data-value="${value}"]`);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = value;
+            btn.classList.remove('loading');
+            btn.classList.add('selected');
+        }
+        
+        const votingStatus = document.getElementById('votingStatus');
+        if (votingStatus) {
+            votingStatus.innerHTML = '<span class="text-success">Vote submitted successfully!</span>';
+        }
+        
+        // Reset status after 3 seconds
+        setTimeout(() => {
+            if (votingStatus) {
+                votingStatus.innerHTML = '<span class="status-text">Vote submitted!</span>';
+            }
+        }, 3000);
+    }
+
+    showVoteError(value, errorMessage) {
+        const btn = document.querySelector(`.card-btn[data-value="${value}"]`);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = value;
+            btn.classList.remove('loading');
+        }
+        
+        const votingStatus = document.getElementById('votingStatus');
+        if (votingStatus) {
+            votingStatus.innerHTML = `<span class="text-danger">Error: ${errorMessage}. Please try again.</span>`;
+        }
+        
+        // Reset status after 5 seconds
+        setTimeout(() => {
+            if (votingStatus) {
+                votingStatus.innerHTML = '<span class="status-text">Cast your vote to estimate the story points</span>';
+            }
+        }, 5000);
+    }
+
+    showVoteError(value, errorMessage) {
+        const votingStatus = document.getElementById('votingStatus');
+        if (votingStatus) {
+            votingStatus.innerHTML = `<span class="status-text text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Failed to submit vote "${value}". ${errorMessage}</span>`;
+            
+            // Clear error message after 5 seconds
+            setTimeout(() => {
+                const hasVoted = this.currentUser && this.votes.has(this.currentUser.id);
+                votingStatus.innerHTML = `<span class="status-text">${hasVoted ? 'Vote submitted!' : 'Cast your vote to estimate the story points'}</span>`;
+            }, 5000);
+        }
+        
+        // Re-enable voting cards
+        const cardBtns = document.querySelectorAll('.card-btn');
+        cardBtns.forEach(btn => {
+            btn.disabled = this.votesRevealed;
+        });
     }
 
     async revealVotes() {

@@ -131,9 +131,9 @@ class FirebaseMessaging {
             const user = await this.ensureAuthenticated();
             this.userId = user.uid;
             await this.setupSessionReferences();
-            // Check if session exists
-            const sessionSnapshot = await get(this.sessionRef);
-            if (!sessionSnapshot.exists()) {
+            // Check if session exists by reading the info node (which has read permission)
+            const sessionInfoSnapshot = await get(this.infoRef);
+            if (!sessionInfoSnapshot.exists()) {
                 throw new Error('Session not found');
             }
             // Try to join session
@@ -180,14 +180,19 @@ class FirebaseMessaging {
             authUid: this.userId,
             username
         });
-        await set(participantRef, {
+        const participantData = {
             name: username,
             isHost: true,
             joinedAt: serverTimestamp(),
             lastSeen: serverTimestamp(),
             connected: true
+        };
+        await set(participantRef, participantData);
+        console.log('[FirebaseMessaging] Host participant created successfully:', {
+            username,
+            userId: this.userId,
+            data: participantData
         });
-        console.log('[FirebaseMessaging] Host participant created:', username, this.userId);
     }
 
     // Join existing session (participant)
@@ -199,14 +204,19 @@ class FirebaseMessaging {
             authUid: this.userId,
             username
         });
-        await set(participantRef, {
+        const participantData = {
             name: username,
             isHost: false,
             joinedAt: serverTimestamp(),
             lastSeen: serverTimestamp(),
             connected: true
+        };
+        await set(participantRef, participantData);
+        console.log('[FirebaseMessaging] Participant joined successfully:', {
+            username,
+            userId: this.userId,
+            data: participantData
         });
-        console.log('[FirebaseMessaging] Participant joined:', username, this.userId);
     }
 
     // Setup real-time listeners

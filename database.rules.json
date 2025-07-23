@@ -12,7 +12,7 @@
             ".validate": "newData.isString() && newData.val().length > 0"
           },
           "createdAt": {
-            ".validate": "newData.val() == now"
+            ".validate": "newData.val() == now || newData.hasChildren()"
           },
           "currentTaskId": {
             ".validate": "newData.val() == null || newData.isString()"
@@ -38,10 +38,10 @@
               ".validate": "newData.isBoolean()"
             },
             "joinedAt": {
-              ".validate": "newData.val() == now"
+              ".validate": "newData.val() == now || newData.hasChildren()"
             },
             "lastSeen": {
-              ".validate": "newData.val() == now"
+              ".validate": "newData.val() == now || newData.hasChildren()"
             },
             "connected": {
               ".validate": "newData.isBoolean()"
@@ -80,7 +80,7 @@
               ".validate": "newData.isString() && (newData.val() == '1' || newData.val() == '2' || newData.val() == '3' || newData.val() == '5' || newData.val() == '8' || newData.val() == '13' || newData.val() == '21' || newData.val() == '?' || newData.val() == '☕')"
             },
             "timestamp": {
-              ".validate": "newData.val() == now"
+              ".validate": "newData.val() == now || newData.hasChildren()"
             }
           }
         }
