@@ -158,28 +158,31 @@ class FirebaseMessaging {
 
     // Create new session (host only)
     async createSession(username) {
-        const sessionData = {
-            info: {
-                hostId: this.userId,
-                createdAt: serverTimestamp(),
-                currentTaskId: null,
-                votingEnabled: false,
-                votesRevealed: false
-            },
-            participants: {
-                [this.userId]: {
-                    name: username,
-                    isHost: true,
-                    joinedAt: serverTimestamp(),
-                    lastSeen: serverTimestamp(),
-                    connected: true
-                }
-            },
-            tasks: {},
-            votes: {}
-        };
+        // Write info node (host only)
+        await set(this.infoRef, {
+            hostId: this.userId,
+            createdAt: serverTimestamp(),
+            currentTaskId: null,
+            votingEnabled: false,
+            votesRevealed: false
+        });
 
-        await set(this.sessionRef, sessionData);
+        // Write participants node (self only)
+        const participantRef = ref(this.participantsRef, this.userId);
+        await set(participantRef, {
+            name: username,
+            isHost: true,
+            joinedAt: serverTimestamp(),
+            lastSeen: serverTimestamp(),
+            connected: true
+        });
+
+        // Write empty tasks node (host only)
+        await set(this.tasksRef, {});
+
+        // Write empty votes node (host only)
+        await set(this.votesRef, {});
+
         console.log('Session created successfully');
     }
 
